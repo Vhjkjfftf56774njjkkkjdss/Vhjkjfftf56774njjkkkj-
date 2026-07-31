@@ -14,6 +14,11 @@
       "expire": "01/08/2026",
       "added": "31/07/2026",
       "vip": true
+    },
+    "@dongnetsun": {
+      "expire": "01/08/2026",
+      "added": "31/07/2026",
+      "vip": true
     }
   },
   "banned": {},
