@@ -376,6 +376,14 @@
       "round": 46,
       "message": "Kích hoạt thất bại",
       "user_id": "7235906278"
+    },
+    {
+      "timestamp": 1785497393.7941835,
+      "datetime": "2026-07-31 11:29:53",
+      "success": false,
+      "round": 47,
+      "message": "Kích hoạt thất bại",
+      "user_id": "7235906278"
     }
   ]
 }
