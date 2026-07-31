@@ -2023,6 +2023,14 @@
       "expires": "N/A",
       "uid": "N/A",
       "user_id": "7235906278"
+    },
+    {
+      "timestamp": 1785506817.4509418,
+      "datetime": "2026-07-31 14:06:57",
+      "success": false,
+      "round": 248,
+      "message": "Kích hoạt thất bại",
+      "user_id": "7235906278"
     }
   ]
 }
