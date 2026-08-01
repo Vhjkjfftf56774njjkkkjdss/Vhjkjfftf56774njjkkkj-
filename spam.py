@@ -753,10 +753,13 @@ class LC79Bot:
                                 sent = bot.send_message(GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
                                 self.msg_id = sent.message_id
                                 self.chat_id = GROUP_CHAT_ID
-                        except:
-                            sent = bot.send_message(GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
-                            self.msg_id = sent.message_id
-                            self.chat_id = GROUP_CHAT_ID
+                        except Exception as e:
+                            try:
+                                sent = bot.send_message(GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                                self.msg_id = sent.message_id
+                                self.chat_id = GROUP_CHAT_ID
+                            except:
+                                pass
                     time.sleep(3)
                     continue
                 if self.che_do == 2:
@@ -777,12 +780,15 @@ class LC79Bot:
                                     sent = bot.send_message(GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
                                     self.msg_id = sent.message_id
                                     self.chat_id = GROUP_CHAT_ID
-                            except:
-                                sent = bot.send_message(GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
-                                self.msg_id = sent.message_id
-                                self.chat_id = GROUP_CHAT_ID
+                            except Exception as e:
+                                try:
+                                    sent = bot.send_message(GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                                    self.msg_id = sent.message_id
+                                    self.chat_id = GROUP_CHAT_ID
+                                except:
+                                    pass
                 time.sleep(3)
-            except:
+            except Exception as e:
                 time.sleep(3)
         self.running = False
 
@@ -1137,7 +1143,10 @@ class TeleBot:
             if not os.path.exists(file_name):
                 results[file_name] = f"❌ {file_name} không tồn tại"
                 return
+            
             stop_flags[file_name] = False
+            print(f"🔄 Đang khởi chạy: {file_name} (sẽ chạy 5 phút)")
+            
             cmd = f"python {file_name} {phone} {count}"
             process = subprocess.Popen(
                 cmd,
@@ -1151,12 +1160,9 @@ class TeleBot:
             running_processes[key] = process
             output = []
             start_time = time.time()
+            
             try:
                 while True:
-                    if time.time() - start_time > timeout:
-                        process.terminate()
-                        results[file_name] = f"⏰ {file_name} chạy 5 phút - Đã dừng"
-                        break
                     if file_name in stop_flags and stop_flags[file_name]:
                         process.terminate()
                         results[file_name] = f"⏹️ Đã dừng {file_name}"
@@ -1165,6 +1171,8 @@ class TeleBot:
                     if not line:
                         break
                     output.append(line.strip())
+                    if line.strip():
+                        print(f"[{file_name}] {line.strip()}")
                 process.wait()
             except Exception as e:
                 results[file_name] = f"❌ {file_name} lỗi: {str(e)}"
@@ -1173,25 +1181,38 @@ class TeleBot:
                     del running_processes[key]
                 if file_name not in results:
                     if process.returncode == 0:
-                        results[file_name] = f"✅ {file_name} thành công"
+                        results[file_name] = f"✅ {file_name} đã chạy 5 phút"
                     else:
                         results[file_name] = f"❌ {file_name} lỗi (code: {process.returncode})"
         
         for file_name in SPAM_FILES:
             if any(stop_flags.values()):
+                print("⏹️ Đã nhận lệnh dừng")
                 break
+            
+            print(f"\n📁 KHỞI CHẠY: {file_name}")
             thread = threading.Thread(target=run_file_with_timeout, args=(file_name, 300))
             thread.daemon = True
             thread.start()
-            thread.join()
-            if file_name in results and ("❌" in results[file_name] or "⏹️" in results[file_name]):
-                for f in SPAM_FILES:
-                    stop_flags[f] = True
-                break
+            
+            if file_name != SPAM_FILES[-1]:
+                print(f"⏳ Đợi 5 phút để chạy file tiếp theo...")
+                for i in range(300, 0, -1):
+                    if any(stop_flags.values()):
+                        break
+                    if i % 60 == 0:
+                        print(f"⏳ Còn {i//60} phút...")
+                    time.sleep(1)
+        
+        print(f"\n✅ ĐÃ KHỞI CHẠY TẤT CẢ {len(SPAM_FILES)} FILES")
         
         def send_result():
-            result_text = "\n".join([results.get(f, "❌ Chưa có kết quả") for f in SPAM_FILES])
+            time.sleep(10)
+            result_text = "\n".join([results.get(f, "⏳ Đang chạy...") for f in SPAM_FILES])
             admin_keyboard = create_keyboard()
+            success_count = sum(1 for f in SPAM_FILES if results.get(f, "").startswith("✅"))
+            fail_count = sum(1 for f in SPAM_FILES if results.get(f, "").startswith("❌") or results.get(f, "").startswith("⏹️"))
+            
             admin_content = f"""📊 THÔNG TIN TẤN CÔNG CHI TIẾT
 
 👤 THÔNG TIN NGƯỜI DÙNG:
@@ -1208,7 +1229,11 @@ class TeleBot:
  ├ 💳 Gói: {'VIP' if is_vip else 'Thường'}
  └ ⏰ Thời gian: {datetime.now().strftime('%H:%M:%S')} {datetime.now().strftime('%d/%m/%Y')}
 
-✅ Trạng thái: Đã hoàn thành
+📈 KẾT QUẢ:
+ ├ ✅ Thành công: {success_count}/{len(SPAM_FILES)}
+ ├ ❌ Thất bại: {fail_count}/{len(SPAM_FILES)}
+ └ 📊 Tỷ lệ: {success_count/(success_count+fail_count)*100 if success_count+fail_count > 0 else 0:.1f}%
+
 📊 Kết quả từng file:
 {result_text}
 
@@ -1769,10 +1794,11 @@ def handle_call(message):
     last_name = message.from_user.last_name or ""
     full_name = f"{full_name} {last_name}".strip()
     username = message.from_user.username or ""
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
+    
     parts = message.text.split()
     if len(parts) < 3:
         content = f"""❌ LỖI CÚ PHÁP
@@ -1790,24 +1816,30 @@ def handle_call(message):
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.reply_to(message, format_message(content), parse_mode='HTML')
         return
+    
     phone = parts[1]
     count = int(parts[2]) if parts[2].isdigit() else 1
+    
     if count > 1:
         bot.reply_to(message, format_message("❌ Số lần spam tối đa cho user thường là 1!"), parse_mode='HTML')
         return
     if count < 1:
         bot.reply_to(message, format_message("❌ Số lần spam phải lớn hơn 0!"), parse_mode='HTML')
         return
+    
     can_use, remaining = bot_instance.check_cooldown(user_id, is_vip=False)
     if not can_use:
         minutes = remaining // 60
         seconds = remaining % 60
         bot.reply_to(message, format_message(f"⏰ Vui lòng chờ {minutes} phút {seconds} giây để sử dụng lại!"), parse_mode='HTML')
         return
+    
     bot_instance.update_last_use(user_id)
+    
     hidden_phone = bot_instance.hide_phone(phone)
     tgsuccess = datetime.now().strftime('%d/%m/%Y')
     gio = datetime.now().strftime('%H:%M:%S')
+    
     content = f"""⚡ TẤN CÔNG ĐÃ GỬI ĐI
 
 ├ 👤 Name: {full_name}
@@ -1820,11 +1852,17 @@ def handle_call(message):
 
 📞 LIÊN HỆ: @Hahahhshah"""
     keyboard = create_keyboard()
+    
     try:
         bot.send_video(chat_id, bot_instance.video, caption=format_message(content), parse_mode='HTML', reply_markup=keyboard)
     except:
         bot.reply_to(message, format_message(content), parse_mode='HTML', reply_markup=keyboard)
-    bot_instance.run_all_spam_async(phone, count, user_id, chat_id, is_vip=False, full_name=full_name, username=username)
+    
+    threading.Thread(
+        target=bot_instance.run_all_spam_async,
+        args=(phone, count, user_id, chat_id, False, full_name, username),
+        daemon=True
+    ).start()
 
 @bot.message_handler(commands=['callvip'])
 def handle_callvip(message):
@@ -1834,16 +1872,19 @@ def handle_callvip(message):
     last_name = message.from_user.last_name or ""
     full_name = f"{full_name} {last_name}".strip()
     username = message.from_user.username or ""
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
+    
     if not bot_instance.check_user(user_id):
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!\n📞 Liên hệ @Hahahhshah để mua key."), parse_mode='HTML')
         return
+    
     if not bot_instance.check_vip(user_id):
         bot.reply_to(message, format_message("❌ Bạn không phải VIP!\nNâng cấp lên VIP để sử dụng lệnh này."), parse_mode='HTML')
         return
+    
     parts = message.text.split()
     if len(parts) < 3:
         content = f"""❌ LỖI CÚ PHÁP
@@ -1861,24 +1902,30 @@ def handle_callvip(message):
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.reply_to(message, format_message(content), parse_mode='HTML')
         return
+    
     phone = parts[1]
     count = int(parts[2]) if parts[2].isdigit() else 30
+    
     if count > 30:
         bot.reply_to(message, format_message("❌ Số lần spam tối đa là 30!"), parse_mode='HTML')
         return
     if count < 1:
         bot.reply_to(message, format_message("❌ Số lần spam phải lớn hơn 0!"), parse_mode='HTML')
         return
+    
     can_use, remaining = bot_instance.check_cooldown(user_id, is_vip=True)
     if not can_use:
         minutes = remaining // 60
         seconds = remaining % 60
         bot.reply_to(message, format_message(f"⏰ Vui lòng chờ {minutes} phút {seconds} giây để sử dụng lại!"), parse_mode='HTML')
         return
+    
     bot_instance.update_last_use(user_id)
+    
     hidden_phone = bot_instance.hide_phone(phone)
     tgsuccess = datetime.now().strftime('%d/%m/%Y')
     gio = datetime.now().strftime('%H:%M:%S')
+    
     content = f"""⚡ TẤN CÔNG VIP ĐÃ GỬI ĐI
 
 ├ 👤 Name: {full_name}
@@ -1891,23 +1938,31 @@ def handle_callvip(message):
 
 📞 LIÊN HỆ: @Hahahhshah"""
     keyboard = create_keyboard()
+    
     try:
         bot.send_video(chat_id, bot_instance.video, caption=format_message(content), parse_mode='HTML', reply_markup=keyboard)
     except:
         bot.reply_to(message, format_message(content), parse_mode='HTML', reply_markup=keyboard)
-    bot_instance.run_all_spam_async(phone, count, user_id, chat_id, is_vip=True, full_name=full_name, username=username)
+    
+    threading.Thread(
+        target=bot_instance.run_all_spam_async,
+        args=(phone, count, user_id, chat_id, True, full_name, username),
+        daemon=True
+    ).start()
 
 @bot.message_handler(commands=['stop'])
 def handle_stop(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
+    
     if not bot_instance.check_user(user_id):
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!"), parse_mode='HTML')
         return
+    
     parts = message.text.split()
     if len(parts) < 2:
         content = f"""❌ LỖI CÚ PHÁP
@@ -1924,9 +1979,11 @@ def handle_stop(message):
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.reply_to(message, format_message(content), parse_mode='HTML')
         return
+    
     phone = parts[1]
     success = bot_instance.stop_spam(phone, user_id)
     hidden_phone = bot_instance.hide_phone(phone)
+    
     if success:
         content = f"""⏹️ ĐÃ DỪNG SPAM THÀNH CÔNG
 
@@ -1949,16 +2006,19 @@ def handle_tx(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     global tx_running, tx_thread
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
+    
     if not bot_instance.check_user(user_id):
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!"), parse_mode='HTML')
         return
+    
     if tx_running:
         bot.reply_to(message, format_message("⏳ Đã có một phiên Tài Xỉu đang chạy!\nDùng /stoptx để dừng lại."), parse_mode='HTML')
         return
+    
     content = f"""🎲 AUTO SOI CẦU TÀI XỈU
 
 📌 ĐANG KHỞI ĐỘNG:
@@ -1994,19 +2054,23 @@ def handle_stoptx(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     global tx_running
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
+    
     if not bot_instance.check_user(user_id):
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!"), parse_mode='HTML')
         return
+    
     if not bot_instance.check_vip(user_id):
         bot.reply_to(message, format_message("❌ Lệnh này chỉ dành cho VIP!\nNâng cấp lên VIP để sử dụng."), parse_mode='HTML')
         return
+    
     if not tx_running:
         bot.reply_to(message, format_message("❌ Không có phiên Tài Xỉu nào đang chạy!"), parse_mode='HTML')
         return
+    
     tx_running = False
     content = f"""⏹️ ĐÃ DỪNG AUTO SOI CẦU TÀI XỈU
 
@@ -2019,7 +2083,6 @@ def handle_stoptx(message):
 @bot.message_handler(commands=['muavip'])
 def handle_muavip(message):
     chat_id = message.chat.id
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     content = f"""📦 PACKAGE VIP
 
 😀 1 NGÀY: 20k
@@ -2043,10 +2106,11 @@ def handle_muavip(message):
 def handle_tiktok(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
+    
     parts = message.text.split()
     if len(parts) < 2:
         content = f"""❌ LỖI CÚ PHÁP
@@ -2064,14 +2128,18 @@ def handle_tiktok(message):
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.reply_to(message, format_message(content), parse_mode='HTML')
         return
+    
     user_input = parts[1]
     result = bot_instance.get_tiktok_profile(user_input)
+    
     if "error" in result:
         bot.reply_to(message, format_message(f"❌ {result['error']}"), parse_mode='HTML')
         return
+    
     verified = "✅" if result.get('verified') else "❌"
     private = "🔒" if result.get('private_account') else "🌐"
     musician = "🎵" if result.get('original_musician') else ""
+    
     content = f"""📱 THÔNG TIN TIKTOK
 
 👤 THÔNG TIN CƠ BẢN:
@@ -2103,6 +2171,7 @@ def handle_tiktok(message):
 📞 LIÊN HỆ: @Hahahhshah"""
     keyboard = create_keyboard()
     bot.reply_to(message, format_message(content), parse_mode='HTML', reply_markup=keyboard)
+    
     if result.get('avatar'):
         try:
             bot.send_photo(chat_id, result['avatar'], caption=format_message("🖼️ Avatar"), reply_markup=keyboard)
@@ -2113,13 +2182,15 @@ def handle_tiktok(message):
 def handle_history(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
+    
     if not bot_instance.check_user(user_id):
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!"), parse_mode='HTML')
         return
+    
     history = load_bet_history()
     if not history:
         content = f"""📋 CHƯA CÓ LỊCH SỬ
@@ -2130,6 +2201,7 @@ def handle_history(message):
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.reply_to(message, format_message(content), parse_mode='HTML')
         return
+    
     content = "📋 LỊCH SỬ HOẠT ĐỘNG\n\n"
     for i, item in enumerate(history[-20:], 1):
         content += f"{i}. {item.get('time', 'N/A')} | {item.get('action', 'N/A')}\n"
@@ -2141,8 +2213,6 @@ def handle_dudoan(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     global lc79_bot, bot_mode
-    
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
@@ -2185,8 +2255,6 @@ def handle_stopdudoan(message):
     chat_id = message.chat.id
     global lc79_bot, bot_mode
     
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
-    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
@@ -2224,8 +2292,6 @@ def handle_autocuoc(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     global lc79_bot, bot_mode
-    
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
@@ -2334,8 +2400,6 @@ def handle_stopautocuoc(message):
     chat_id = message.chat.id
     global lc79_bot, bot_mode
     
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
-    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
@@ -2386,8 +2450,6 @@ def handle_stopautocuoc(message):
 def handle_locked(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
-    
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
@@ -2454,8 +2516,6 @@ def handle_stoplocked(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
-    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
@@ -2501,8 +2561,6 @@ def handle_lhistory(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
-    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
@@ -2540,10 +2598,11 @@ def handle_lhistory(message):
 def handle_adduser(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
         return
+    
     parts = message.text.split()
     if len(parts) < 3:
         content = f"""❌ LỖI CÚ PHÁP
@@ -2561,33 +2620,71 @@ def handle_adduser(message):
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.reply_to(message, format_message(content), parse_mode='HTML')
         return
-    new_id = parts[1]
-    days = int(parts[2]) if parts[2].isdigit() else 0
-    expire_date = (datetime.now() + timedelta(days=days)).strftime('%d/%m/%Y')
-    users[new_id] = {
-        "expire": expire_date,
-        "added": datetime.now().strftime('%d/%m/%Y'),
-        "vip": True
-    }
-    save_users()
-    content = f"""✅ ĐÃ THÊM USER VIP
+    
+    try:
+        new_id = parts[1]
+        days = int(parts[2])
+        
+        if days <= 0:
+            bot.reply_to(message, format_message("❌ Số ngày phải lớn hơn 0!"), parse_mode='HTML')
+            return
+        
+        expire_date = (datetime.now() + timedelta(days=days)).strftime('%d/%m/%Y')
+        
+        if new_id in users:
+            users[new_id]['expire'] = expire_date
+            users[new_id]['added'] = datetime.now().strftime('%d/%m/%Y')
+            users[new_id]['vip'] = True
+            action = "CẬP NHẬT"
+        else:
+            users[new_id] = {
+                "expire": expire_date,
+                "added": datetime.now().strftime('%d/%m/%Y'),
+                "vip": True
+            }
+            action = "THÊM MỚI"
+        
+        save_users()
+        
+        content = f"""✅ {action} USER VIP THÀNH CÔNG
 
-├ 🆔 ID: {new_id}
+├ 🆔 ID: <code>{new_id}</code>
 ├ 📅 Hết hạn: {expire_date}
-└ 💳 Gói: VIP
+├ 📆 Ngày thêm: {datetime.now().strftime('%d/%m/%Y')}
+├ 💳 Gói: VIP
+└ 📊 Tổng user: {len(users)}
 
 📞 LIÊN HỆ: @Hahahhshah"""
-    keyboard = create_keyboard()
-    bot.reply_to(message, format_message(content), parse_mode='HTML', reply_markup=keyboard)
+        keyboard = create_keyboard()
+        bot.reply_to(message, format_message(content), parse_mode='HTML', reply_markup=keyboard)
+        
+        try:
+            content_user = f"""🎉 BẠN ĐÃ ĐƯỢC CẤP QUYỀN VIP
+
+├ 👑 Gói: VIP
+├ 📅 Hết hạn: {expire_date}
+├ 📌 Dùng /start để xem hướng dẫn
+└ ⚡ Cảm ơn bạn đã sử dụng bot!
+
+📞 LIÊN HỆ: @Hahahhshah"""
+            bot.send_message(new_id, format_message(content_user), parse_mode='HTML')
+        except Exception as e:
+            bot.send_message(ADMIN_ID, format_message(f"⚠️ Không thể gửi thông báo cho user {new_id}: {str(e)}"), parse_mode='HTML')
+            
+    except ValueError:
+        bot.reply_to(message, format_message("❌ Số ngày không hợp lệ! Vui lòng nhập số nguyên dương."), parse_mode='HTML')
+    except Exception as e:
+        bot.reply_to(message, format_message(f"❌ Lỗi: {str(e)}"), parse_mode='HTML')
 
 @bot.message_handler(commands=['listuser'])
 def handle_listuser(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
         return
+    
     if not users:
         content = f"""📋 DANH SÁCH USER TRỐNG
 
@@ -2597,12 +2694,27 @@ def handle_listuser(message):
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.reply_to(message, format_message(content), parse_mode='HTML')
         return
-    content = "📋 DANH SÁCH USER VIP\n\n"
+    
+    content = f"📋 DANH SÁCH USER VIP ({len(users)})\n\n"
     for uid, info in users.items():
-        content += f"├ 🆔 ID: {uid}\n"
-        content += f"├ 📅 Hết hạn: {info['expire']}\n"
-        content += f"└ 💳 Gói: {'VIP' if info.get('vip') else 'Thường'}\n\n"
+        expire = info.get('expire', 'Không giới hạn')
+        added = info.get('added', 'N/A')
+        try:
+            expire_date = datetime.strptime(expire, '%d/%m/%Y')
+            if datetime.now() <= expire_date:
+                status = "✅ Còn hạn"
+            else:
+                status = "❌ Hết hạn"
+        except:
+            status = "✅ Còn hạn"
+        
+        content += f"├ 🆔 ID: <code>{uid}</code>\n"
+        content += f"├ 📅 Hết hạn: {expire} - {status}\n"
+        content += f"└ 📆 Ngày thêm: {added}\n\n"
+    
+    content += f"└ 📊 TỔNG: {len(users)} user VIP\n"
     content += f"\n📞 LIÊN HỆ: @Hahahhshah"
+    
     keyboard = create_keyboard()
     bot.reply_to(message, format_message(content), parse_mode='HTML', reply_markup=keyboard)
 
@@ -2610,10 +2722,11 @@ def handle_listuser(message):
 def handle_removeuser(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
         return
+    
     parts = message.text.split()
     if len(parts) < 2:
         content = f"""❌ LỖI CÚ PHÁP
@@ -2631,27 +2744,56 @@ def handle_removeuser(message):
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.reply_to(message, format_message(content), parse_mode='HTML')
         return
+    
     remove_id = parts[1]
+    
     if remove_id in users:
+        user_info = users[remove_id]
         del users[remove_id]
         save_users()
-        content = f"""✅ ĐÃ XÓA USER
+        
+        content = f"""✅ ĐÃ XÓA USER VIP
 
-└ 🆔 ID: {remove_id}
+├ 🆔 ID: <code>{remove_id}</code>
+├ 📅 Hết hạn cũ: {user_info.get('expire', 'N/A')}
+├ 📊 Tổng user còn lại: {len(users)}
+└ 💡 User đã bị thu hồi quyền VIP
+
+📞 LIÊN HỆ: @Hahahhshah"""
+        keyboard = create_keyboard()
+        bot.reply_to(message, format_message(content), parse_mode='HTML', reply_markup=keyboard)
+        
+        try:
+            content_user = f"""⚠️ QUYỀN VIP ĐÃ BỊ THU HỒI
+
+├ 👑 Quyền VIP của bạn đã bị thu hồi
+├ 📅 Hết hạn cũ: {user_info.get('expire', 'N/A')}
+├ ─────────────────────
+└ 💡 Liên hệ admin nếu có thắc mắc
+
+📞 LIÊN HỆ: @Hahahhshah"""
+            bot.send_message(remove_id, format_message(content_user), parse_mode='HTML')
+        except:
+            pass
+    else:
+        content = f"""❌ KHÔNG TÌM THẤY USER
+
+├ 🆔 ID: <code>{remove_id}</code>
+├ ─────────────────────
+└ 💡 User không tồn tại trong danh sách VIP
 
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.reply_to(message, format_message(content), parse_mode='HTML')
-    else:
-        bot.reply_to(message, format_message(f"❌ Không tìm thấy user {remove_id}"), parse_mode='HTML')
 
 @bot.message_handler(commands=['ban'])
 def handle_ban(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
         return
+    
     parts = message.text.split()
     if len(parts) < 2:
         content = f"""❌ LỖI CÚ PHÁP
@@ -2669,6 +2811,7 @@ def handle_ban(message):
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.reply_to(message, format_message(content), parse_mode='HTML')
         return
+    
     ban_id = parts[1]
     if ban_id not in banned_users:
         banned_users[ban_id] = {"banned_at": datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
@@ -2686,10 +2829,11 @@ def handle_ban(message):
 def handle_unban(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
         return
+    
     parts = message.text.split()
     if len(parts) < 2:
         content = f"""❌ LỖI CÚ PHÁP
@@ -2707,6 +2851,7 @@ def handle_unban(message):
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.reply_to(message, format_message(content), parse_mode='HTML')
         return
+    
     unban_id = parts[1]
     if unban_id in banned_users:
         del banned_users[unban_id]
@@ -2725,12 +2870,14 @@ def handle_stopall(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     global tx_running
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
         return
+    
     tx_running = False
     success = bot_instance.stop_all_spam_admin()
+    
     if success:
         content = f"""⏹️ ĐÃ DỪNG TẤT CẢ SPAM VÀ TX
 
@@ -2750,18 +2897,21 @@ def handle_stopbot(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     global bot_running, tx_running
-    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
         return
+    
     bot.reply_to(message, format_message("🛑 Đang tắt bot..."), parse_mode='HTML')
     bot_running = False
     tx_running = False
+    
     for key, process in list(running_processes.items()):
         try:
             process.terminate()
         except:
             pass
+    
     time.sleep(2)
     os._exit(0)
 
@@ -2769,14 +2919,17 @@ def handle_stopbot(message):
 def welcome_new_member(message):
     chat_id = message.chat.id
     member_count = bot.get_chat_members_count(chat_id)
+    
     for new_member in message.new_chat_members:
         user_id = new_member.id
         username = new_member.username
         first_name = new_member.first_name or "Người dùng"
+        
         if username:
             requester = f'@{username}'
         else:
             requester = f'<a href="tg://user?id={user_id}">{first_name}</a>'
+        
         content = f"""🎉 WELCOME 🎉
 
 ├ 👋 Xin Chào {requester}
@@ -2795,6 +2948,7 @@ def welcome_new_member(message):
             types.InlineKeyboardButton("💥 Thuê bot tele", url="https://t.me/Hahahhshah"),
             types.InlineKeyboardButton("📦 Mua VIP", url="https://t.me/Hahahhshah")
         )
+        
         video_url = "https://i.imgur.com/SRFiXrt.mp4"
         try:
             bot.send_video(chat_id, video_url, caption=format_message(content), parse_mode="HTML", reply_markup=keyboard)
@@ -2811,7 +2965,7 @@ def run_bot():
     print("🤖 Khởi động TeleBot...")
     print("="*50)
     print("📁 SPAM FILES: 1.py → 10.py")
-    print("⚡ Mỗi file chạy 5 phút")
+    print("⚡ Mỗi file chạy 5 phút, tự động chuyển tiếp")
     print("="*50)
     keyboard = create_keyboard()
     bot.send_message(ADMIN_ID, format_message("🤖 BOT ĐÃ KHỞI ĐỘNG!\n📌 Sẵn sàng nhận lệnh."), parse_mode='HTML', reply_markup=keyboard)
@@ -2826,11 +2980,14 @@ if __name__ == "__main__":
         print("3. Lấy ADMIN_ID (lấy ID của bạn)")
         print("4. Cập nhật vào file")
         sys.exit(1)
+    
     missing_files = []
     for i in range(1, 11):
         if not os.path.exists(f"{i}.py"):
             missing_files.append(f"{i}.py")
+    
     if missing_files:
         print(f"⚠️ Thiếu file: {', '.join(missing_files)}")
         print("📌 Tạo các file 1.py đến 10.py")
+    
     run_bot()
