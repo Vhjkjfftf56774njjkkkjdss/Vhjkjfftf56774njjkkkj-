@@ -268,589 +268,6 @@ def remove_active_task(username):
         del active_tasks[username]
         save_active_tasks()
 
-class TaiXiuPredictor:
-    def __init__(self, bot, group_id, admin_id):
-        self.bot = bot
-        self.group_id = group_id
-        self.admin_id = admin_id
-        self.running = True
-        self.api_data = []
-        self.last_session_id = None
-        self.prediction_history = []
-        
-    def stop(self):
-        self.running = False
-        
-    def fetch_data(self):
-        try:
-            url = "https://wtxmd52.tele68.com/v1/txmd5/lite-sessions"
-            resp = requests.get(url, timeout=10)
-            if resp.status_code != 200:
-                return None
-            data = resp.json()
-            raw = data.get('list', [])
-            if not raw:
-                return None
-            sorted_data = sorted(raw, key=lambda x: x['id'], reverse=True)
-            self.api_data = sorted_data[:20] if len(sorted_data) >= 20 else sorted_data
-            return self.api_data
-        except:
-            return None
-    
-    def analyze_from_old(self, results):
-        if len(results) < 9:
-            return []
-        preds = []
-        cau_7 = [results[6], results[5], results[4], results[3], results[2], results[1], results[0]]
-        chuoi_7 = "".join(["T" if r == "TAI" else "X" for r in cau_7])
-        if chuoi_7 == "TXXXTTT":
-            preds.append(('Cầu 7-7', 'TÀI', 92, 'T X X X T T T'))
-        elif chuoi_7 == "XTTTXXX":
-            preds.append(('Cầu 7-7', 'XỈU', 92, 'X T T T X X X'))
-        cau_3 = [results[2], results[1], results[0]]
-        chuoi_3 = "".join(["T" if r == "TAI" else "X" for r in cau_3])
-        if chuoi_3 == "XTT":
-            preds.append(('Cầu XTT', 'XỈU', 88, 'X T T'))
-        elif chuoi_3 == "TXX":
-            preds.append(('Cầu TXX', 'TÀI', 88, 'T X X'))
-        cau_1_1 = [results[1], results[0]]
-        chuoi_1_1 = "".join(["T" if r == "TAI" else "X" for r in cau_1_1])
-        if chuoi_1_1 == "XT":
-            preds.append(('Cầu 1-1', 'XỈU', 85, 'X→T'))
-        elif chuoi_1_1 == "TX":
-            preds.append(('Cầu 1-1', 'TÀI', 85, 'T→X'))
-        cau_3_3 = [results[5], results[4], results[3], results[2], results[1], results[0]]
-        chuoi_3_3 = "".join(["T" if r == "TAI" else "X" for r in cau_3_3])
-        if chuoi_3_3 == "TXXTXX":
-            preds.append(('Cầu 3-3', 'TÀI', 90, 'T X X T X X'))
-        elif chuoi_3_3 == "XTTXTT":
-            preds.append(('Cầu 3-3', 'XỈU', 90, 'X T T X T T'))
-        if len(results) >= 8:
-            cau_4_4 = [results[7], results[6], results[5], results[4], results[3], results[2], results[1], results[0]]
-            chuoi_4_4 = "".join(["T" if r == "TAI" else "X" for r in cau_4_4])
-            if chuoi_4_4 == "TXXTXTTX":
-                preds.append(('Cầu 4-4', 'XỈU', 95, 'T X X T X T T X'))
-            elif chuoi_4_4 == "XTTXTXXT":
-                preds.append(('Cầu 4-4', 'TÀI', 95, 'X T T X T X X T'))
-        if chuoi_1_1 == "XX":
-            preds.append(('Bệt Xỉu 2', 'XỈU', 70, 'X X'))
-        elif chuoi_1_1 == "TT":
-            preds.append(('Bệt Tài 2', 'TÀI', 70, 'T T'))
-        if chuoi_3 == "XXX":
-            preds.append(('Bệt Xỉu 3', 'XỈU', 80, 'X X X'))
-        elif chuoi_3 == "TTT":
-            preds.append(('Bệt Tài 3', 'TÀI', 80, 'T T T'))
-        if len(results) >= 4:
-            cau_4 = [results[3], results[2], results[1], results[0]]
-            chuoi_4 = "".join(["T" if r == "TAI" else "X" for r in cau_4])
-            if chuoi_4 == "XXXX":
-                preds.append(('Bệt Xỉu 4', 'XỈU', 85, 'X X X X'))
-            elif chuoi_4 == "TTTT":
-                preds.append(('Bệt Tài 4', 'TÀI', 85, 'T T T T'))
-        if len(results) >= 5:
-            cau_5 = [results[4], results[3], results[2], results[1], results[0]]
-            chuoi_5 = "".join(["T" if r == "TAI" else "X" for r in cau_5])
-            if chuoi_5 == "XXXXX":
-                preds.append(('Bệt Xỉu 5', 'XỈU', 90, 'X X X X X'))
-            elif chuoi_5 == "TTTTT":
-                preds.append(('Bệt Tài 5', 'TÀI', 90, 'T T T T T'))
-        if len(results) >= 6:
-            cau_6 = [results[5], results[4], results[3], results[2], results[1], results[0]]
-            chuoi_6 = "".join(["T" if r == "TAI" else "X" for r in cau_6])
-            if chuoi_6[:5] == "XXXXX" and chuoi_6[5] == "T":
-                preds.append(('Bẻ Xỉu→Tài', 'XỈU', 85, 'X X X X X→T'))
-            elif chuoi_6[:5] == "TTTTT" and chuoi_6[5] == "X":
-                preds.append(('Bẻ Tài→Xỉu', 'TÀI', 85, 'T T T T T→X'))
-        if not preds:
-            last = results[0]
-            pred = 'XỈU' if last == 'XIU' else 'TÀI'
-            preds.append(('Theo ván cuối', pred, 50, 'T' if last == 'TAI' else 'X'))
-        unique = {}
-        for name, pred, conf, pattern in preds:
-            key = pred
-            if key not in unique or conf > unique[key][2]:
-                unique[key] = (name, pred, conf, pattern)
-        return list(unique.values())
-    
-    def predict(self):
-        if not self.api_data:
-            return None
-        results = []
-        for item in self.api_data:
-            if 'resultTruyenThong' in item:
-                r = item['resultTruyenThong'].upper()
-                if r in ['TAI', 'XIU']:
-                    results.append(r)
-        if len(results) < 9:
-            return {'result': '?', 'confidence': 0, 'pattern': 'Chưa đủ dữ liệu'}
-        preds = self.analyze_from_old(results)
-        if not preds:
-            return {'result': '?', 'confidence': 0, 'pattern': 'Không có dự đoán'}
-        best = max(preds, key=lambda x: x[2])
-        name, pred, conf, pattern = best
-        return {
-            'result': pred,
-            'confidence': conf,
-            'pattern': name,
-            'pattern_detail': pattern,
-            'all_predictions': preds
-        }
-    
-    def format_message(self):
-        pred = self.predict()
-        if not pred or pred.get('result') == '?':
-            return "⏳ Đang phân tích dữ liệu..."
-        now = datetime.now().strftime("%H:%M:%S %d/%m/%Y")
-        recent = self.api_data[:8] if self.api_data else []
-        chuoi = ""
-        for item in recent:
-            if 'resultTruyenThong' in item:
-                r = item['resultTruyenThong'].upper()
-                if r == 'TAI':
-                    chuoi += "T"
-                elif r == 'XIU':
-                    chuoi += "X"
-        msg = "🎲 <b>TÀI XỈU - SOI CẦU ĐOÁN NGU</b>\n"
-        msg += f"⏰ {now}\n\n"
-        if chuoi:
-            msg += f"📊 CHUỖI: <b>{chuoi}</b>\n"
-        tai = chuoi.count('T')
-        xiu = chuoi.count('X')
-        if tai + xiu > 0:
-            msg += f"📈 TÀI: {tai} | XỈU: {xiu}\n\n"
-        msg += "🔮 <b>DỰ ĐOÁN PHIÊN TIẾP THEO</b>\n"
-        msg += f"🔥 {pred['result']} - Độ tin cậy: <b>{pred['confidence']}%</b>\n"
-        msg += f"📌 {pred['pattern']}\n"
-        if pred['confidence'] >= 90:
-            msg += "💪 BÁCH TRÚNG! TỰ TIN ĐÁNH!\n"
-        elif pred['confidence'] >= 80:
-            msg += "👍 TỰ TIN ĐÁNH!\n"
-        elif pred['confidence'] >= 70:
-            msg += "⚠️ ĐÁNH VỪA PHẢI\n"
-        else:
-            msg += "⏳ QUAN SÁT THÊM\n"
-        return msg
-
-class LC79Bot:
-    def __init__(self):
-        self.username = ""
-        self.password = ""
-        self.md5_password = ""
-        self.token = ""
-        self.jwt_token = ""
-        self.balance = 0
-        self.initial_balance = 0
-        self.bet_amount = 1000
-        self.target_profit = 0
-        self.is_logged_in = False
-        self.betting_active = False
-        self.current_session_id = None
-        self.tx_history = []
-        self.history_loaded = False
-        self.total_bets = 0
-        self.wins = 0
-        self.losses = 0
-        self.bet_history = []
-        self.du_doan_history = []
-        self.phien_da_cuoc = None
-        self.che_do = 1
-        self.da_gui_telegram = set()
-        self.last_bet_result_msg = ""
-        self.running = False
-        self.predictor = None
-        self.last_checked_session = None
-        self.stopped_by_target = False
-        self.stopped_by_insufficient = False
-        self.is_dudoan_mode = False
-        self.is_private = False
-        self.msg_id = None
-        self.chat_id = None
-
-    def login(self, username, password):
-        try:
-            self.username = username
-            self.password = password
-            self.md5_password = hashlib.md5(password.encode()).hexdigest()
-            login_res = requests.get(
-                "https://apifo88daigia.tele68.com/api?c=3&un=" + username + "&pw=" + self.md5_password + "&cp=R&cl=R&pf=web&at=",
-                timeout=10
-            )
-            login_data = login_res.json()
-            if not login_data.get('success'):
-                return False
-            self.token = login_data['accessToken']
-            session_key = login_data['sessionKey']
-            nick_name = username
-            try:
-                session_raw = base64.b64decode(session_key).decode()
-                session_data = json.loads(session_raw)
-                if session_data.get('nickname'):
-                    nick_name = session_data['nickname']
-            except:
-                pass
-            auth_res = requests.post(
-                "https://wlb.tele68.com/v1/lobby/auth/login?cp=R&cl=R&pf=web&at=" + self.token,
-                json={
-                    "username": username,
-                    "password": self.md5_password,
-                    "nickName": nick_name,
-                    "accessToken": self.token,
-                    "sessionKey": session_key
-                },
-                timeout=10
-            )
-            auth_data = auth_res.json()
-            if not auth_data.get('token'):
-                return False
-            self.jwt_token = auth_data['token']
-            self.balance = auth_data.get('remoteLoginResp', {}).get('money', 0)
-            self.is_logged_in = True
-            return True
-        except:
-            return False
-
-    def get_balance(self):
-        try:
-            res = requests.get(
-                "https://gameapi.tele68.com/v1/profile/balance?cp=R&cl=R&pf=web&at=" + self.token,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": "Bearer " + self.jwt_token
-                },
-                timeout=10
-            )
-            if res.ok:
-                data = res.json()
-                self.balance = data.get('balance') or data.get('money') or data.get('von') or 0
-                return self.balance
-        except:
-            pass
-        return self.balance
-
-    def fetch_history(self):
-        try:
-            res = requests.get(
-                "https://wtxmd52.tele68.com/v1/txmd5/sessions?cp=R&cl=R&pf=web&at=" + self.token,
-                timeout=10
-            )
-            data = res.json()
-            if data and data.get('list'):
-                self.tx_history = data['list']
-                self.current_session_id = data['list'][0]['id']
-                if not self.history_loaded:
-                    self.history_loaded = True
-                return True
-        except:
-            pass
-        return False
-
-    def place_bet(self, prediction_data):
-        try:
-            if self.balance < self.bet_amount:
-                content = f"""⚠️ SỐ DƯ KHÔNG ĐỦ
- ├ 💰 Số dư hiện tại: {format_money(self.balance)}đ
- ├ 💵 Cần tối thiểu: {format_money(self.bet_amount)}đ
- └ 🛑 Bot sẽ dừng lại!"""
-                bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
-                if not self.is_private:
-                    bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
-                self.stopped_by_insufficient = True
-                self.stop_auto_bet()
-                return False
-            bet_session = self.current_session_id
-            if self.phien_da_cuoc == bet_session:
-                return False
-            bet_type = prediction_data.get('result', '')
-            if bet_type == 'TÀI':
-                bet_type = 'TAI'
-            elif bet_type == 'XỈU':
-                bet_type = 'XIU'
-            else:
-                return False
-            bet_side = 'T' if bet_type == 'TAI' else 'X'
-            pattern_type = prediction_data.get('pattern', '')
-            body = {
-                "username": self.username,
-                "password": self.md5_password,
-                "amount": self.bet_amount,
-                "side": bet_side,
-                "session": bet_session,
-                "type": bet_type
-            }
-            res = requests.post(
-                "https://wtxmd52.tele68.com/v1/txmd5/bet?limit=8&cp=R&cl=R&pf=web&at=" + self.token,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": "Bearer " + self.jwt_token
-                },
-                json=body,
-                timeout=10
-            )
-            if res.ok:
-                data = res.json()
-                if data.get('postBalance') is not None:
-                    pre_balance = self.balance
-                    self.balance = data['postBalance']
-                    self.phien_da_cuoc = bet_session
-                    result_key = data.get('result') or data.get('ketQua') or data.get('ket_qua') or ''
-                    won = None
-                    if result_key:
-                        if result_key in ['TAI', 'TÀI', 'T']:
-                            result_tx = 'TÀI'
-                        elif result_key in ['XIU', 'XỈU', 'X']:
-                            result_tx = 'XỈU'
-                        else:
-                            result_tx = None
-                        if result_tx:
-                            won = result_tx == prediction_data.get('result')
-                    if won is None:
-                        if self.balance > pre_balance:
-                            won = True
-                        elif self.balance < pre_balance:
-                            won = False
-                    self.total_bets += 1
-                    bet_item = {
-                        'time': datetime.now().strftime("%H:%M:%S"),
-                        'session': bet_session,
-                        'predict': prediction_data.get('result'),
-                        'pattern': pattern_type,
-                        'bet_amount': self.bet_amount,
-                        'win': won,
-                        'balance_after': self.balance,
-                        'status': 'done' if won is not None else 'waiting'
-                    }
-                    self.bet_history.append(bet_item)
-                    save_bet_history(self.bet_history)
-                    if won:
-                        self.wins += 1
-                        result_text = "✅ THẮNG +" + format_money(self.bet_amount) + "đ → " + format_money(self.balance) + "đ"
-                    else:
-                        self.losses += 1
-                        result_text = "❌ THUA -" + format_money(self.bet_amount) + "đ → " + format_money(self.balance) + "đ"
-                    msg = self.tao_tin_nhan_day_du(prediction_data, bet_session, result_text)
-                    if not self.is_private:
-                        bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
-                    profit = self.balance - self.initial_balance
-                    if self.target_profit > 0 and profit >= self.target_profit:
-                        content = f"""🎯 ĐẠT MỤC TIÊU LỢI NHUẬN
- ├ 💰 Lợi nhuận: <b>+{format_money(profit)}đ</b>
- ├ 🎯 Mục tiêu: {format_money(self.target_profit)}đ
- └ 🛑 Bot sẽ dừng lại!"""
-                        bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
-                        if not self.is_private:
-                            bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
-                        self.stopped_by_target = True
-                        self.stop_auto_bet()
-                        return False
-                    if self.balance < self.bet_amount:
-                        content = f"""⚠️ SỐ DƯ KHÔNG ĐỦ
- ├ 💰 Số dư hiện tại: {format_money(self.balance)}đ
- ├ 💵 Cần tối thiểu: {format_money(self.bet_amount)}đ
- └ 🛑 Bot sẽ dừng lại!"""
-                        bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
-                        if not self.is_private:
-                            bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
-                        self.stopped_by_insufficient = True
-                        self.stop_auto_bet()
-                        return False
-                    return True
-                if data.get('message') == "out_of_time":
-                    return False
-                if data.get('message') == "insufficient_funds":
-                    content = f"""⚠️ SỐ DƯ KHÔNG ĐỦ
- ├ 💰 Số dư hiện tại: {format_money(self.balance)}đ
- ├ 💵 Cần tối thiểu: {format_money(self.bet_amount)}đ
- └ 🛑 Bot sẽ dừng lại!"""
-                    bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
-                    if not self.is_private:
-                        bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
-                    self.stopped_by_insufficient = True
-                    self.stop_auto_bet()
-                    return False
-                return False
-            else:
-                err_text = res.text
-                if 'out_of_time' in err_text:
-                    return False
-                return False
-        except:
-            return False
-
-    def tao_tin_nhan_day_du(self, prediction_data, bet_session, result_text=""):
-        now = datetime.now().strftime("%H:%M:%S %d/%m/%Y")
-        if prediction_data.get('result') == 'TÀI':
-            du_doan_text = "🔥 TÀI"
-        elif prediction_data.get('result') == 'XỈU':
-            du_doan_text = "❄️ XỈU"
-        else:
-            du_doan_text = "⏸️ NGHỈ (THEO DÕI)"
-        confidence = prediction_data.get('confidence', 0)
-        pattern_type = prediction_data.get('pattern', '')
-        pattern_detail = prediction_data.get('pattern_detail', '')
-        message = "🎲 <b>TAI XỈU - SOI CẦU ĐOÁN NGU</b>\n"
-        message += "⏰ " + now + "\n\n"
-        if pattern_type:
-            message += "📊 <b>PHÂN TÍCH CẦU:</b>\n"
-            message += f"🔹 {pattern_type}\n"
-            if pattern_detail:
-                message += f"🔸 Mẫu: {pattern_detail}\n"
-        if self.target_profit > 0:
-            profit = self.balance - self.initial_balance
-            message += f"🎯 Mục tiêu: {format_money(self.target_profit)}đ | Lợi nhuận: {format_money(profit)}đ\n"
-        message += "\n🔮 <b>DỰ ĐOÁN PHIÊN " + str(bet_session) + "</b>\n"
-        message += du_doan_text + "\n"
-        if confidence > 0:
-            message += "📊 Độ tin cậy: <b>" + str(confidence) + "%</b>\n"
-            if confidence >= 90:
-                message += "💪 BÁCH TRÚNG! TỰ TIN ĐÁNH!\n"
-            elif confidence >= 80:
-                message += "💪 TỰ TIN ĐÁNH!\n"
-            elif confidence >= 70:
-                message += "⚠️ ĐÁNH VỪA PHẢI\n"
-            else:
-                message += "⏳ QUAN SÁT THÊM\n"
-        message += "🧠 Chiến lược: <b>SOI CẦU ĐOÁN NGU</b>\n"
-        if result_text:
-            message += "\n" + result_text
-        return message
-
-    def auto_run(self):
-        self.phien_da_cuoc = None
-        last_session_id = None
-        self.running = True
-        while self.running and self.betting_active:
-            try:
-                if not self.predictor:
-                    self.predictor = TaiXiuPredictor(bot, GROUP_CHAT_ID, ADMIN_ID)
-                    self.predictor.fetch_data()
-                self.predictor.fetch_data()
-                pred = self.predictor.predict()
-                if not pred or pred.get('result') == '?':
-                    time.sleep(3)
-                    continue
-                data = self.predictor.api_data
-                if not data:
-                    time.sleep(3)
-                    continue
-                current_id = str(data[0]['id'])
-                if current_id != last_session_id:
-                    self.phien_da_cuoc = None
-                    last_session_id = current_id
-                self.current_session_id = data[0]['id']
-                bet_session = self.current_session_id
-                if self.phien_da_cuoc == bet_session:
-                    time.sleep(3)
-                    continue
-                if self.che_do == 1:
-                    msg = self.predictor.format_message()
-                    try:
-                        if self.msg_id and self.chat_id:
-                            bot.edit_message_text(format_message(msg), self.chat_id, self.msg_id, parse_mode='HTML')
-                        else:
-                            sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
-                            self.msg_id = sent.message_id
-                            self.chat_id = sent.chat.id
-                    except:
-                        sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
-                        self.msg_id = sent.message_id
-                        self.chat_id = sent.chat.id
-                    time.sleep(3)
-                    continue
-                if self.che_do == 2:
-                    if self.stopped_by_target or self.stopped_by_insufficient:
-                        break
-                    confidence = pred.get('confidence', 0)
-                    if confidence >= 70 and pred.get('result') in ['TÀI', 'XỈU']:
-                        self.place_bet(pred)
-                    else:
-                        msg = self.predictor.format_message()
-                        try:
-                            if self.msg_id and self.chat_id:
-                                bot.edit_message_text(format_message(msg), self.chat_id, self.msg_id, parse_mode='HTML')
-                            else:
-                                sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
-                                self.msg_id = sent.message_id
-                                self.chat_id = sent.chat.id
-                        except:
-                            sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
-                            self.msg_id = sent.message_id
-                            self.chat_id = sent.chat.id
-                time.sleep(3)
-            except Exception as e:
-                time.sleep(3)
-        self.running = False
-
-    def start_auto_bet(self, is_private=False, chat_id=None, msg_id=None):
-        self.is_private = is_private
-        self.chat_id = chat_id or self.chat_id or GROUP_CHAT_ID
-        self.msg_id = msg_id
-        if self.betting_active:
-            return
-        self.get_balance()
-        self.stopped_by_target = False
-        self.stopped_by_insufficient = False
-        if self.balance < self.bet_amount:
-            content = f"""⚠️ KHÔNG ĐỦ VỐN
- ├ 💰 Số dư: {format_money(self.balance)}đ
- ├ 💵 Cần tối thiểu: {format_money(self.bet_amount)}đ
- └ 🛑 Không thể khởi động bot!"""
-            bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
-            return
-        self.betting_active = True
-        self.phien_da_cuoc = None
-        self.bet_history = load_bet_history()
-        target_text = f"{format_money(self.target_profit)}đ" if self.target_profit > 0 else "Không giới hạn"
-        content_admin = f"""🚀 BẮT ĐẦU AUTO BET - SOI CẦU ĐOÁN NGU
- ├ 💰 Vốn: {format_money(self.balance)}đ
- ├ 💵 Mỗi tay: {format_money(self.bet_amount)}đ
- ├ 🎯 Mục tiêu lời: {target_text}
- ├ ⚡ Chiến lược: SOI CẦU ĐOÁN NGU
- ├ 📊 Các loại cầu: 1-1, 2-2, 3-3, 4-4, 7-7, Bệt, Bẻ
- └ 🧠 Chỉ đánh khi độ tin cậy >= 70%"""
-        bot.send_message(ADMIN_ID, format_message(content_admin), parse_mode='HTML')
-        thread = threading.Thread(target=self.auto_run, daemon=True)
-        thread.start()
-
-    def start_dudoan_mode(self, is_private=False, chat_id=None, msg_id=None):
-        self.is_private = is_private
-        self.chat_id = chat_id or self.chat_id or GROUP_CHAT_ID
-        self.msg_id = msg_id
-        if self.betting_active:
-            return
-        self.is_dudoan_mode = True
-        self.betting_active = True
-        self.che_do = 1
-        self.phien_da_cuoc = None
-        content_admin = f"""📊 Đã khởi động chế độ DỰ ĐOÁN
- ├ 📌 Dùng /stopdudoan để dừng
- └ ⚡ Đang phân tích soi cầu..."""
-        bot.send_message(ADMIN_ID, format_message(content_admin), parse_mode='HTML')
-        thread = threading.Thread(target=self.auto_run, daemon=True)
-        thread.start()
-
-    def stop_auto_bet(self):
-        self.betting_active = False
-        self.running = False
-        self.is_dudoan_mode = False
-        if self.predictor:
-            self.predictor.stop()
-    
-    def stop_dudoan_mode(self):
-        if self.is_dudoan_mode:
-            self.betting_active = False
-            self.running = False
-            self.is_dudoan_mode = False
-            if self.predictor:
-                self.predictor.stop()
-            bot.send_message(ADMIN_ID, format_message("🛑 Đã dừng chế độ DỰ ĐOÁN"), parse_mode='HTML')
-            if not self.is_private:
-                content = f"""🛑 ĐÃ DỪNG CHẾ ĐỘ DỰ ĐOÁN
- ├ 📊 Đã ngừng phân tích soi cầu
- └ ⏳ Bot đang ở trạng thái chờ"""
-                bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
-            return True
-        return False
-
 class LocketTool:
     def __init__(self):
         self.base_url = "https://locket-tu-xa.vercel.app"
@@ -968,6 +385,101 @@ class LocketTool:
         else:
             result["message"] = "Kích hoạt thất bại"
         return result
+
+def run_locked_continuous(target_username, chat_id, msg_id, stop_flag, user_id):
+    total_rounds = 0
+    total_success = 0
+    
+    if target_username in active_tasks:
+        active_tasks[target_username]["start_time"] = time.time()
+        save_active_tasks()
+    
+    while not stop_flag["stop"]:
+        total_rounds += 1
+        round_start = time.time()
+        
+        tool = LocketTool()
+        result = tool.process_user(target_username)
+        
+        round_time = round(time.time() - round_start, 2)
+        
+        if target_username in active_tasks:
+            active_tasks[target_username]["total_rounds"] = total_rounds
+            if result.get("success"):
+                active_tasks[target_username]["total_success"] = total_success + 1
+            save_active_tasks()
+        
+        if result.get("success"):
+            total_success += 1
+            add_locket_history(target_username, {
+                "success": True,
+                "round": total_rounds,
+                "email": result.get('email'),
+                "product": result.get('product'),
+                "expires": result.get('expires'),
+                "uid": result.get('uid'),
+                "user_id": user_id
+            })
+            
+            report = f"""<blockquote>✅ KÍCH HOẠT THÀNH CÔNG
+├ 📅 THỜI GIAN: {datetime.now().strftime('%H:%M:%S %d/%m/%Y')}
+├ 👤 USERNAME: @{target_username}
+├ 🔄 LẦN CHẠY: {total_rounds}
+├ ⏱️ THỜI GIAN: {round_time}s
+├ 📊 THÀNH CÔNG: {total_success} lần
+├ ─────────────────────
+├ 🎉 <b>CHI TIẾT:</b>
+├ 📧 Email: {result.get('email')}
+├ 📦 Gói: {result.get('product')}
+├ 📅 Hết hạn: {result.get('expires')}
+├ 🆔 UID: {result.get('uid')}
+└ 📌 TỔNG KẾT: {total_success}/{total_rounds}
+</blockquote>"""
+        else:
+            add_locket_history(target_username, {
+                "success": False,
+                "round": total_rounds,
+                "message": result.get('message', 'Không xác định'),
+                "user_id": user_id
+            })
+            
+            report = f"""<blockquote>❌ KÍCH HOẠT THẤT BẠI
+├ 📅 THỜI GIAN: {datetime.now().strftime('%H:%M:%S %d/%m/%Y')}
+├ 👤 USERNAME: @{target_username}
+├ 🔄 LẦN CHẠY: {total_rounds}
+├ ⏱️ THỜI GIAN: {round_time}s
+├ 📊 THÀNH CÔNG: {total_success} lần
+├ ─────────────────────
+├ ⚠️ LÝ DO: {result.get('message', 'Không xác định')}
+└ 📌 TỔNG KẾT: {total_success}/{total_rounds}
+</blockquote>"""
+        
+        try:
+            bot.edit_message_text(report, chat_id, msg_id, parse_mode='HTML')
+        except:
+            sent_msg = bot.send_message(chat_id, report, parse_mode='HTML')
+            msg_id = sent_msg.message_id
+            if target_username in active_tasks:
+                active_tasks[target_username]["msg_id"] = msg_id
+                save_active_tasks()
+        
+        if not stop_flag["stop"]:
+            time.sleep(2)
+    
+    final_report = f"""<blockquote>🛑 ĐÃ DỪNG KÍCH HOẠT 🛑
+├ 👤 USER: @{target_username}
+├ 🔄 TỔNG LẦN CHẠY: {total_rounds}
+├ ✅ TỔNG THÀNH CÔNG: {total_success}
+├ ─────────────────────
+└ 📞 LIÊN HỆ: @Hahahhshah
+</blockquote>"""
+    
+    try:
+        bot.edit_message_text(final_report, chat_id, msg_id, parse_mode='HTML')
+    except:
+        bot.send_message(chat_id, final_report, parse_mode='HTML')
+    
+    remove_active_task(target_username)
 
 class TeleBot:
     def __init__(self):
@@ -1599,102 +1111,557 @@ class TeleBot:
         finally:
             tx_running = False
 
-bot_instance = TeleBot()
+class LC79Bot:
+    def __init__(self):
+        self.username = ""
+        self.password = ""
+        self.md5_password = ""
+        self.token = ""
+        self.jwt_token = ""
+        self.balance = 0
+        self.initial_balance = 0
+        self.bet_amount = 1000
+        self.target_profit = 0
+        self.is_logged_in = False
+        self.betting_active = False
+        self.current_session_id = None
+        self.tx_history = []
+        self.history_loaded = False
+        self.total_bets = 0
+        self.wins = 0
+        self.losses = 0
+        self.bet_history = []
+        self.du_doan_history = []
+        self.phien_da_cuoc = None
+        self.che_do = 2
+        self.da_gui_telegram = set()
+        self.last_bet_result_msg = ""
+        self.running = False
+        self.predictor = None
+        self.last_checked_session = None
+        self.stopped_by_target = False
+        self.stopped_by_insufficient = False
+        self.is_dudoan_mode = False
+        self.is_private = False
+        self.msg_id = None
+        self.chat_id = None
 
-def run_locked_continuous(target_username, chat_id, msg_id, stop_flag, user_id):
-    total_rounds = 0
-    total_success = 0
-    
-    if target_username in active_tasks:
-        active_tasks[target_username]["start_time"] = time.time()
-        save_active_tasks()
-    
-    while not stop_flag["stop"]:
-        total_rounds += 1
-        round_start = time.time()
-        
-        tool = LocketTool()
-        result = tool.process_user(target_username)
-        
-        round_time = round(time.time() - round_start, 2)
-        
-        if target_username in active_tasks:
-            active_tasks[target_username]["total_rounds"] = total_rounds
-            if result.get("success"):
-                active_tasks[target_username]["total_success"] = total_success + 1
-            save_active_tasks()
-        
-        if result.get("success"):
-            total_success += 1
-            add_locket_history(target_username, {
-                "success": True,
-                "round": total_rounds,
-                "email": result.get('email'),
-                "product": result.get('product'),
-                "expires": result.get('expires'),
-                "uid": result.get('uid'),
-                "user_id": user_id
-            })
-            
-            report = f"""<blockquote>✅ KÍCH HOẠT THÀNH CÔNG
-├ 📅 THỜI GIAN: {datetime.now().strftime('%H:%M:%S %d/%m/%Y')}
-├ 👤 USERNAME: @{target_username}
-├ 🔄 LẦN CHẠY: {total_rounds}
-├ ⏱️ THỜI GIAN: {round_time}s
-├ 📊 THÀNH CÔNG: {total_success} lần
-├ ─────────────────────
-├ 🎉 <b>CHI TIẾT:</b>
-├ 📧 Email: {result.get('email')}
-├ 📦 Gói: {result.get('product')}
-├ 📅 Hết hạn: {result.get('expires')}
-├ 🆔 UID: {result.get('uid')}
-└ 📌 TỔNG KẾT: {total_success}/{total_rounds}
-</blockquote>"""
-        else:
-            add_locket_history(target_username, {
-                "success": False,
-                "round": total_rounds,
-                "message": result.get('message', 'Không xác định'),
-                "user_id": user_id
-            })
-            
-            report = f"""<blockquote>❌ KÍCH HOẠT THẤT BẠI
-├ 📅 THỜI GIAN: {datetime.now().strftime('%H:%M:%S %d/%m/%Y')}
-├ 👤 USERNAME: @{target_username}
-├ 🔄 LẦN CHẠY: {total_rounds}
-├ ⏱️ THỜI GIAN: {round_time}s
-├ 📊 THÀNH CÔNG: {total_success} lần
-├ ─────────────────────
-├ ⚠️ LÝ DO: {result.get('message', 'Không xác định')}
-└ 📌 TỔNG KẾT: {total_success}/{total_rounds}
-</blockquote>"""
-        
+    def login(self, username, password):
         try:
-            bot.edit_message_text(report, chat_id, msg_id, parse_mode='HTML')
+            self.username = username
+            self.password = password
+            self.md5_password = hashlib.md5(password.encode()).hexdigest()
+            login_res = requests.get(
+                "https://apifo88daigia.tele68.com/api?c=3&un=" + username + "&pw=" + self.md5_password + "&cp=R&cl=R&pf=web&at=",
+                timeout=10
+            )
+            login_data = login_res.json()
+            if not login_data.get('success'):
+                return False
+            self.token = login_data['accessToken']
+            session_key = login_data['sessionKey']
+            nick_name = username
+            try:
+                session_raw = base64.b64decode(session_key).decode()
+                session_data = json.loads(session_raw)
+                if session_data.get('nickname'):
+                    nick_name = session_data['nickname']
+            except:
+                pass
+            auth_res = requests.post(
+                "https://wlb.tele68.com/v1/lobby/auth/login?cp=R&cl=R&pf=web&at=" + self.token,
+                json={
+                    "username": username,
+                    "password": self.md5_password,
+                    "nickName": nick_name,
+                    "accessToken": self.token,
+                    "sessionKey": session_key
+                },
+                timeout=10
+            )
+            auth_data = auth_res.json()
+            if not auth_data.get('token'):
+                return False
+            self.jwt_token = auth_data['token']
+            self.balance = auth_data.get('remoteLoginResp', {}).get('money', 0)
+            self.is_logged_in = True
+            return True
         except:
-            sent_msg = bot.send_message(chat_id, report, parse_mode='HTML')
-            msg_id = sent_msg.message_id
-            if target_username in active_tasks:
-                active_tasks[target_username]["msg_id"] = msg_id
-                save_active_tasks()
+            return False
+
+    def get_balance(self):
+        try:
+            res = requests.get(
+                "https://gameapi.tele68.com/v1/profile/balance?cp=R&cl=R&pf=web&at=" + self.token,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + self.jwt_token
+                },
+                timeout=10
+            )
+            if res.ok:
+                data = res.json()
+                self.balance = data.get('balance') or data.get('money') or data.get('von') or 0
+                return self.balance
+        except:
+            pass
+        return self.balance
+
+    def fetch_history(self):
+        try:
+            res = requests.get(
+                "https://wtxmd52.tele68.com/v1/txmd5/sessions?cp=R&cl=R&pf=web&at=" + self.token,
+                timeout=10
+            )
+            data = res.json()
+            if data and data.get('list'):
+                self.tx_history = data['list']
+                self.current_session_id = data['list'][0]['id']
+                if not self.history_loaded:
+                    self.history_loaded = True
+                return True
+        except:
+            pass
+        return False
+
+    def place_bet(self, prediction_data):
+        try:
+            if self.balance < self.bet_amount:
+                content = f"""⚠️ SỐ DƯ KHÔNG ĐỦ
+ ├ 💰 Số dư hiện tại: {format_money(self.balance)}đ
+ ├ 💵 Cần tối thiểu: {format_money(self.bet_amount)}đ
+ └ 🛑 Bot sẽ dừng lại!"""
+                bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
+                if not self.is_private:
+                    bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
+                self.stopped_by_insufficient = True
+                self.stop_auto_bet()
+                return False
+            bet_session = self.current_session_id
+            if self.phien_da_cuoc == bet_session:
+                return False
+            bet_type = prediction_data.get('result', '')
+            if bet_type == 'TÀI':
+                bet_type = 'TAI'
+            elif bet_type == 'XỈU':
+                bet_type = 'XIU'
+            else:
+                return False
+            bet_side = 'T' if bet_type == 'TAI' else 'X'
+            pattern_type = prediction_data.get('pattern', '')
+            body = {
+                "username": self.username,
+                "password": self.md5_password,
+                "amount": self.bet_amount,
+                "side": bet_side,
+                "session": bet_session,
+                "type": bet_type
+            }
+            res = requests.post(
+                "https://wtxmd52.tele68.com/v1/txmd5/bet?limit=8&cp=R&cl=R&pf=web&at=" + self.token,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + self.jwt_token
+                },
+                json=body,
+                timeout=10
+            )
+            if res.ok:
+                data = res.json()
+                if data.get('postBalance') is not None:
+                    pre_balance = self.balance
+                    self.balance = data['postBalance']
+                    self.phien_da_cuoc = bet_session
+                    result_key = data.get('result') or data.get('ketQua') or data.get('ket_qua') or ''
+                    won = None
+                    if result_key:
+                        if result_key in ['TAI', 'TÀI', 'T']:
+                            result_tx = 'TÀI'
+                        elif result_key in ['XIU', 'XỈU', 'X']:
+                            result_tx = 'XỈU'
+                        else:
+                            result_tx = None
+                        if result_tx:
+                            won = result_tx == prediction_data.get('result')
+                    if won is None:
+                        if self.balance > pre_balance:
+                            won = True
+                        elif self.balance < pre_balance:
+                            won = False
+                    self.total_bets += 1
+                    bet_item = {
+                        'time': datetime.now().strftime("%H:%M:%S"),
+                        'session': bet_session,
+                        'predict': prediction_data.get('result'),
+                        'pattern': pattern_type,
+                        'bet_amount': self.bet_amount,
+                        'win': won,
+                        'balance_after': self.balance,
+                        'status': 'done' if won is not None else 'waiting'
+                    }
+                    self.bet_history.append(bet_item)
+                    save_bet_history(self.bet_history)
+                    if won:
+                        self.wins += 1
+                        result_text = "✅ THẮNG +" + format_money(self.bet_amount) + "đ → " + format_money(self.balance) + "đ"
+                    else:
+                        self.losses += 1
+                        result_text = "❌ THUA -" + format_money(self.bet_amount) + "đ → " + format_money(self.balance) + "đ"
+                    msg = self.tao_tin_nhan_day_du(prediction_data, bet_session, result_text)
+                    if not self.is_private:
+                        bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                    profit = self.balance - self.initial_balance
+                    if self.target_profit > 0 and profit >= self.target_profit:
+                        content = f"""🎯 ĐẠT MỤC TIÊU LỢI NHUẬN
+ ├ 💰 Lợi nhuận: <b>+{format_money(profit)}đ</b>
+ ├ 🎯 Mục tiêu: {format_money(self.target_profit)}đ
+ └ 🛑 Bot sẽ dừng lại!"""
+                        bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
+                        if not self.is_private:
+                            bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
+                        self.stopped_by_target = True
+                        self.stop_auto_bet()
+                        return False
+                    if self.balance < self.bet_amount:
+                        content = f"""⚠️ SỐ DƯ KHÔNG ĐỦ
+ ├ 💰 Số dư hiện tại: {format_money(self.balance)}đ
+ ├ 💵 Cần tối thiểu: {format_money(self.bet_amount)}đ
+ └ 🛑 Bot sẽ dừng lại!"""
+                        bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
+                        if not self.is_private:
+                            bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
+                        self.stopped_by_insufficient = True
+                        self.stop_auto_bet()
+                        return False
+                    return True
+                if data.get('message') == "out_of_time":
+                    return False
+                if data.get('message') == "insufficient_funds":
+                    content = f"""⚠️ SỐ DƯ KHÔNG ĐỦ
+ ├ 💰 Số dư hiện tại: {format_money(self.balance)}đ
+ ├ 💵 Cần tối thiểu: {format_money(self.bet_amount)}đ
+ └ 🛑 Bot sẽ dừng lại!"""
+                    bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
+                    if not self.is_private:
+                        bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
+                    self.stopped_by_insufficient = True
+                    self.stop_auto_bet()
+                    return False
+                return False
+            else:
+                err_text = res.text
+                if 'out_of_time' in err_text:
+                    return False
+                return False
+        except:
+            return False
+
+    def tao_tin_nhan_day_du(self, prediction_data, bet_session, result_text=""):
+        now = datetime.now().strftime("%H:%M:%S %d/%m/%Y")
+        if prediction_data.get('result') == 'TÀI':
+            du_doan_text = "🔥 TÀI"
+        elif prediction_data.get('result') == 'XỈU':
+            du_doan_text = "❄️ XỈU"
+        else:
+            du_doan_text = "⏸️ NGHỈ (THEO DÕI)"
+        confidence = prediction_data.get('confidence', 0)
+        pattern_type = prediction_data.get('pattern', '')
+        pattern_detail = prediction_data.get('pattern_detail', '')
+        message = "🎲 <b>TAI XỈU - SOI CẦU ĐOÁN NGU</b>\n"
+        message += "⏰ " + now + "\n\n"
+        if pattern_type:
+            message += "📊 <b>PHÂN TÍCH CẦU:</b>\n"
+            message += f"🔹 {pattern_type}\n"
+            if pattern_detail:
+                message += f"🔸 Mẫu: {pattern_detail}\n"
+        if self.target_profit > 0:
+            profit = self.balance - self.initial_balance
+            message += f"🎯 Mục tiêu: {format_money(self.target_profit)}đ | Lợi nhuận: {format_money(profit)}đ\n"
+        message += "\n🔮 <b>DỰ ĐOÁN PHIÊN " + str(bet_session) + "</b>\n"
+        message += du_doan_text + "\n"
+        if confidence > 0:
+            message += "📊 Độ tin cậy: <b>" + str(confidence) + "%</b>\n"
+            if confidence >= 90:
+                message += "💪 BÁCH TRÚNG! TỰ TIN ĐÁNH!\n"
+            elif confidence >= 80:
+                message += "💪 TỰ TIN ĐÁNH!\n"
+            elif confidence >= 70:
+                message += "⚠️ ĐÁNH VỪA PHẢI\n"
+            else:
+                message += "⏳ QUAN SÁT THÊM\n"
+        message += "🧠 Chiến lược: <b>SOI CẦU ĐOÁN NGU</b>\n"
+        if result_text:
+            message += "\n" + result_text
+        return message
+
+    def auto_run(self):
+        self.phien_da_cuoc = None
+        last_session_id = None
+        self.running = True
+        while self.running and self.betting_active:
+            try:
+                if not self.predictor:
+                    self.predictor = TaiXiuPredictor(bot, GROUP_CHAT_ID, ADMIN_ID)
+                    self.predictor.fetch_data()
+                self.predictor.fetch_data()
+                pred = self.predictor.predict()
+                if not pred or pred.get('result') == '?':
+                    time.sleep(3)
+                    continue
+                data = self.predictor.api_data
+                if not data:
+                    time.sleep(3)
+                    continue
+                current_id = str(data[0]['id'])
+                if current_id != last_session_id:
+                    self.phien_da_cuoc = None
+                    last_session_id = current_id
+                self.current_session_id = data[0]['id']
+                bet_session = self.current_session_id
+                if self.phien_da_cuoc == bet_session:
+                    time.sleep(3)
+                    continue
+                if self.che_do == 1:
+                    msg = self.predictor.format_message()
+                    try:
+                        if self.msg_id and self.chat_id:
+                            bot.edit_message_text(format_message(msg), self.chat_id, self.msg_id, parse_mode='HTML')
+                        else:
+                            sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                            self.msg_id = sent.message_id
+                            self.chat_id = sent.chat.id
+                    except:
+                        sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                        self.msg_id = sent.message_id
+                        self.chat_id = sent.chat.id
+                    time.sleep(3)
+                    continue
+                if self.che_do == 2:
+                    if self.stopped_by_target or self.stopped_by_insufficient:
+                        break
+                    confidence = pred.get('confidence', 0)
+                    if confidence >= 70 and pred.get('result') in ['TÀI', 'XỈU']:
+                        self.place_bet(pred)
+                    else:
+                        msg = self.predictor.format_message()
+                        try:
+                            if self.msg_id and self.chat_id:
+                                bot.edit_message_text(format_message(msg), self.chat_id, self.msg_id, parse_mode='HTML')
+                            else:
+                                sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                                self.msg_id = sent.message_id
+                                self.chat_id = sent.chat.id
+                        except:
+                            sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                            self.msg_id = sent.message_id
+                            self.chat_id = sent.chat.id
+                time.sleep(3)
+            except Exception as e:
+                time.sleep(3)
+        self.running = False
+
+    def start_auto_bet(self, is_private=False, chat_id=None, msg_id=None):
+        self.is_private = is_private
+        self.chat_id = chat_id or self.chat_id or GROUP_CHAT_ID
+        self.msg_id = msg_id
+        if self.betting_active:
+            return
+        self.get_balance()
+        self.stopped_by_target = False
+        self.stopped_by_insufficient = False
+        if self.balance < self.bet_amount:
+            content = f"""⚠️ KHÔNG ĐỦ VỐN
+ ├ 💰 Số dư: {format_money(self.balance)}đ
+ ├ 💵 Cần tối thiểu: {format_money(self.bet_amount)}đ
+ └ 🛑 Không thể khởi động bot!"""
+            bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
+            return
+        self.betting_active = True
+        self.phien_da_cuoc = None
+        self.bet_history = load_bet_history()
+        target_text = f"{format_money(self.target_profit)}đ" if self.target_profit > 0 else "Không giới hạn"
+        content_admin = f"""🚀 BẮT ĐẦU AUTO BET - SOI CẦU ĐOÁN NGU
+ ├ 💰 Vốn: {format_money(self.balance)}đ
+ ├ 💵 Mỗi tay: {format_money(self.bet_amount)}đ
+ ├ 🎯 Mục tiêu lời: {target_text}
+ ├ ⚡ Chiến lược: SOI CẦU ĐOÁN NGU
+ ├ 📊 Các loại cầu: 1-1, 2-2, 3-3, 4-4, 7-7, Bệt, Bẻ
+ └ 🧠 Chỉ đánh khi độ tin cậy >= 70%"""
+        bot.send_message(ADMIN_ID, format_message(content_admin), parse_mode='HTML')
+        thread = threading.Thread(target=self.auto_run, daemon=True)
+        thread.start()
+
+    def stop_auto_bet(self):
+        self.betting_active = False
+        self.running = False
+        self.is_dudoan_mode = False
+        if self.predictor:
+            self.predictor.stop()
+
+class TaiXiuPredictor:
+    def __init__(self, bot, group_id, admin_id):
+        self.bot = bot
+        self.group_id = group_id
+        self.admin_id = admin_id
+        self.running = True
+        self.api_data = []
+        self.last_session_id = None
+        self.prediction_history = []
         
-        if not stop_flag["stop"]:
-            time.sleep(2)
+    def stop(self):
+        self.running = False
+        
+    def fetch_data(self):
+        try:
+            url = "https://wtxmd52.tele68.com/v1/txmd5/lite-sessions"
+            resp = requests.get(url, timeout=10)
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+            raw = data.get('list', [])
+            if not raw:
+                return None
+            sorted_data = sorted(raw, key=lambda x: x['id'], reverse=True)
+            self.api_data = sorted_data[:20] if len(sorted_data) >= 20 else sorted_data
+            return self.api_data
+        except:
+            return None
     
-    final_report = f"""<blockquote>🛑 ĐÃ DỪNG KÍCH HOẠT 🛑
-├ 👤 USER: @{target_username}
-├ 🔄 TỔNG LẦN CHẠY: {total_rounds}
-├ ✅ TỔNG THÀNH CÔNG: {total_success}
-├ ─────────────────────
-└ 📞 LIÊN HỆ: @Hahahhshah
-</blockquote>"""
+    def analyze_from_old(self, results):
+        if len(results) < 9:
+            return []
+        preds = []
+        cau_7 = [results[6], results[5], results[4], results[3], results[2], results[1], results[0]]
+        chuoi_7 = "".join(["T" if r == "TAI" else "X" for r in cau_7])
+        if chuoi_7 == "TXXXTTT":
+            preds.append(('Cầu 7-7', 'TÀI', 92, 'T X X X T T T'))
+        elif chuoi_7 == "XTTTXXX":
+            preds.append(('Cầu 7-7', 'XỈU', 92, 'X T T T X X X'))
+        cau_3 = [results[2], results[1], results[0]]
+        chuoi_3 = "".join(["T" if r == "TAI" else "X" for r in cau_3])
+        if chuoi_3 == "XTT":
+            preds.append(('Cầu XTT', 'XỈU', 88, 'X T T'))
+        elif chuoi_3 == "TXX":
+            preds.append(('Cầu TXX', 'TÀI', 88, 'T X X'))
+        cau_1_1 = [results[1], results[0]]
+        chuoi_1_1 = "".join(["T" if r == "TAI" else "X" for r in cau_1_1])
+        if chuoi_1_1 == "XT":
+            preds.append(('Cầu 1-1', 'XỈU', 85, 'X→T'))
+        elif chuoi_1_1 == "TX":
+            preds.append(('Cầu 1-1', 'TÀI', 85, 'T→X'))
+        cau_3_3 = [results[5], results[4], results[3], results[2], results[1], results[0]]
+        chuoi_3_3 = "".join(["T" if r == "TAI" else "X" for r in cau_3_3])
+        if chuoi_3_3 == "TXXTXX":
+            preds.append(('Cầu 3-3', 'TÀI', 90, 'T X X T X X'))
+        elif chuoi_3_3 == "XTTXTT":
+            preds.append(('Cầu 3-3', 'XỈU', 90, 'X T T X T T'))
+        if len(results) >= 8:
+            cau_4_4 = [results[7], results[6], results[5], results[4], results[3], results[2], results[1], results[0]]
+            chuoi_4_4 = "".join(["T" if r == "TAI" else "X" for r in cau_4_4])
+            if chuoi_4_4 == "TXXTXTTX":
+                preds.append(('Cầu 4-4', 'XỈU', 95, 'T X X T X T T X'))
+            elif chuoi_4_4 == "XTTXTXXT":
+                preds.append(('Cầu 4-4', 'TÀI', 95, 'X T T X T X X T'))
+        if chuoi_1_1 == "XX":
+            preds.append(('Bệt Xỉu 2', 'XỈU', 70, 'X X'))
+        elif chuoi_1_1 == "TT":
+            preds.append(('Bệt Tài 2', 'TÀI', 70, 'T T'))
+        if chuoi_3 == "XXX":
+            preds.append(('Bệt Xỉu 3', 'XỈU', 80, 'X X X'))
+        elif chuoi_3 == "TTT":
+            preds.append(('Bệt Tài 3', 'TÀI', 80, 'T T T'))
+        if len(results) >= 4:
+            cau_4 = [results[3], results[2], results[1], results[0]]
+            chuoi_4 = "".join(["T" if r == "TAI" else "X" for r in cau_4])
+            if chuoi_4 == "XXXX":
+                preds.append(('Bệt Xỉu 4', 'XỈU', 85, 'X X X X'))
+            elif chuoi_4 == "TTTT":
+                preds.append(('Bệt Tài 4', 'TÀI', 85, 'T T T T'))
+        if len(results) >= 5:
+            cau_5 = [results[4], results[3], results[2], results[1], results[0]]
+            chuoi_5 = "".join(["T" if r == "TAI" else "X" for r in cau_5])
+            if chuoi_5 == "XXXXX":
+                preds.append(('Bệt Xỉu 5', 'XỈU', 90, 'X X X X X'))
+            elif chuoi_5 == "TTTTT":
+                preds.append(('Bệt Tài 5', 'TÀI', 90, 'T T T T T'))
+        if len(results) >= 6:
+            cau_6 = [results[5], results[4], results[3], results[2], results[1], results[0]]
+            chuoi_6 = "".join(["T" if r == "TAI" else "X" for r in cau_6])
+            if chuoi_6[:5] == "XXXXX" and chuoi_6[5] == "T":
+                preds.append(('Bẻ Xỉu→Tài', 'XỈU', 85, 'X X X X X→T'))
+            elif chuoi_6[:5] == "TTTTT" and chuoi_6[5] == "X":
+                preds.append(('Bẻ Tài→Xỉu', 'TÀI', 85, 'T T T T T→X'))
+        if not preds:
+            last = results[0]
+            pred = 'XỈU' if last == 'XIU' else 'TÀI'
+            preds.append(('Theo ván cuối', pred, 50, 'T' if last == 'TAI' else 'X'))
+        unique = {}
+        for name, pred, conf, pattern in preds:
+            key = pred
+            if key not in unique or conf > unique[key][2]:
+                unique[key] = (name, pred, conf, pattern)
+        return list(unique.values())
     
-    try:
-        bot.edit_message_text(final_report, chat_id, msg_id, parse_mode='HTML')
-    except:
-        bot.send_message(chat_id, final_report, parse_mode='HTML')
+    def predict(self):
+        if not self.api_data:
+            return None
+        results = []
+        for item in self.api_data:
+            if 'resultTruyenThong' in item:
+                r = item['resultTruyenThong'].upper()
+                if r in ['TAI', 'XIU']:
+                    results.append(r)
+        if len(results) < 9:
+            return {'result': '?', 'confidence': 0, 'pattern': 'Chưa đủ dữ liệu'}
+        preds = self.analyze_from_old(results)
+        if not preds:
+            return {'result': '?', 'confidence': 0, 'pattern': 'Không có dự đoán'}
+        best = max(preds, key=lambda x: x[2])
+        name, pred, conf, pattern = best
+        return {
+            'result': pred,
+            'confidence': conf,
+            'pattern': name,
+            'pattern_detail': pattern,
+            'all_predictions': preds
+        }
     
-    remove_active_task(target_username)
+    def format_message(self):
+        pred = self.predict()
+        if not pred or pred.get('result') == '?':
+            return "⏳ Đang phân tích dữ liệu..."
+        now = datetime.now().strftime("%H:%M:%S %d/%m/%Y")
+        recent = self.api_data[:8] if self.api_data else []
+        chuoi = ""
+        for item in recent:
+            if 'resultTruyenThong' in item:
+                r = item['resultTruyenThong'].upper()
+                if r == 'TAI':
+                    chuoi += "T"
+                elif r == 'XIU':
+                    chuoi += "X"
+        msg = "🎲 <b>TÀI XỈU - SOI CẦU ĐOÁN NGU</b>\n"
+        msg += f"⏰ {now}\n\n"
+        if chuoi:
+            msg += f"📊 CHUỖI: <b>{chuoi}</b>\n"
+        tai = chuoi.count('T')
+        xiu = chuoi.count('X')
+        if tai + xiu > 0:
+            msg += f"📈 TÀI: {tai} | XỈU: {xiu}\n\n"
+        msg += "🔮 <b>DỰ ĐOÁN PHIÊN TIẾP THEO</b>\n"
+        msg += f"🔥 {pred['result']} - Độ tin cậy: <b>{pred['confidence']}%</b>\n"
+        msg += f"📌 {pred['pattern']}\n"
+        if pred['confidence'] >= 90:
+            msg += "💪 BÁCH TRÚNG! TỰ TIN ĐÁNH!\n"
+        elif pred['confidence'] >= 80:
+            msg += "👍 TỰ TIN ĐÁNH!\n"
+        elif pred['confidence'] >= 70:
+            msg += "⚠️ ĐÁNH VỪA PHẢI\n"
+        else:
+            msg += "⏳ QUAN SÁT THÊM\n"
+        return msg
+
+bot_instance = TeleBot()
 
 @bot.message_handler(commands=['start'])
 def handle_start(message):
@@ -1711,10 +1678,8 @@ def handle_start(message):
  ├ /tiktok [username] - Lấy thông tin TikTok (FREE)
  ├ /muavip - Xem giá VIP
  ├ /history - Lịch sử
- ├ /dudoan - Chế độ dự đoán Tài Xỉu (FREE)
  ├ /autocuoc - Auto cược Tài Xỉu (VIP)
  ├ /stopautocuoc - Dừng auto cược
- ├ /stopdudoan - Dừng dự đoán
  ├ /locked [username] - Kích hoạt Locket Gold (VIP)
  ├ /stoplocked [username] - Dừng kích hoạt Locket
  ├ /lhistory - Lịch sử Locket
@@ -1747,12 +1712,11 @@ def handle_help(message):
  ├ /tiktok [username] - Lấy thông tin TikTok
  ├ /muavip - Xem giá VIP
  ├ /history - Lịch sử
- └ /dudoan - Chế độ dự đoán Tài Xỉu (FREE)
+ └ /autocuoc - Auto cược Tài Xỉu (VIP)
 
 👑 LỆNH VIP:
  ├ /autocuoc - Auto cược Tài Xỉu
  ├ /stopautocuoc - Dừng auto cược
- ├ /stopdudoan - Dừng dự đoán
  ├ /locked [username] - Kích hoạt Locket Gold
  ├ /stoplocked [username] - Dừng kích hoạt Locket
  └ /lhistory - Lịch sử Locket
@@ -2196,85 +2160,6 @@ def handle_history(message):
     content += f"\n📞 LIÊN HỆ: @Hahahhshah"
     bot.reply_to(message, format_message(content), parse_mode='HTML')
 
-@bot.message_handler(commands=['dudoan'])
-def handle_dudoan(message):
-    user_id = str(message.from_user.id)
-    chat_id = message.chat.id
-    global lc79_bot, bot_mode
-    
-    if user_id in banned_users:
-        bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
-        return
-    
-    if not bot_instance.check_user(user_id):
-        bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!\n📞 Liên hệ @Hahahhshah để mua key."), parse_mode='HTML')
-        return
-    
-    if lc79_bot and (lc79_bot.is_dudoan_mode or lc79_bot.betting_active):
-        if lc79_bot.is_dudoan_mode:
-            bot.reply_to(message, format_message("ℹ️ Chế độ dự đoán đang chạy, không cần khởi động lại!"), parse_mode='HTML')
-        else:
-            bot.reply_to(message, format_message("ℹ️ Bot auto cược đang chạy! Vui lòng dùng /stopautocuoc để dừng trước."), parse_mode='HTML')
-        return
-    
-    if lc79_bot:
-        lc79_bot.stop_auto_bet()
-        lc79_bot = None
-    
-    lc79_bot = LC79Bot()
-    bot_mode = "dudoan"
-    
-    content = f"""📊 ĐÃ KHỞI ĐỘNG CHẾ ĐỘ THEO DÕI - SOI CẦU ĐOÁN NGU (FREE)
-
-⚡ Phân tích các loại cầu:
- ├ 1-1, 3-3, 4-4, 7-7
- ├ Bệt, Bẻ, XTT/TXX
- └ Độ tin cậy từ 70-95%
-
-📌 Dùng /stopdudoan để dừng chế độ dự đoán
-
-📞 LIÊN HỆ: @Hahahhshah"""
-    sent_msg = bot.reply_to(message, format_message(content), parse_mode='HTML')
-    lc79_bot.start_dudoan_mode(message.chat.type == 'private', sent_msg.chat.id, sent_msg.message_id)
-
-@bot.message_handler(commands=['stopdudoan'])
-def handle_stopdudoan(message):
-    user_id = str(message.from_user.id)
-    chat_id = message.chat.id
-    global lc79_bot, bot_mode
-    
-    if user_id in banned_users:
-        bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
-        return
-    
-    if not bot_instance.check_user(user_id):
-        bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!"), parse_mode='HTML')
-        return
-    
-    if not bot_instance.check_vip(user_id):
-        bot.reply_to(message, format_message("❌ Lệnh này chỉ dành cho VIP!\nNâng cấp lên VIP để sử dụng."), parse_mode='HTML')
-        return
-    
-    if not lc79_bot:
-        bot.reply_to(message, format_message("ℹ️ Chưa có bot nào đang chạy!"), parse_mode='HTML')
-        return
-    
-    if lc79_bot.is_dudoan_mode:
-        if lc79_bot.stop_dudoan_mode():
-            bot_mode = "idle"
-            content = f"""🛑 ĐÃ DỪNG CHẾ ĐỘ DỰ ĐOÁN
-
-📊 Đã ngừng phân tích soi cầu
-⏳ Bot đang ở trạng thái chờ
-📌 Dùng /dudoan để khởi động lại khi cần
-
-📞 LIÊN HỆ: @Hahahhshah"""
-            bot.reply_to(message, format_message(content), parse_mode='HTML')
-    elif lc79_bot.betting_active:
-        bot.reply_to(message, format_message("ℹ️ Bot đang ở chế độ AUTO CƯỢC\nDùng /stopautocuoc để dừng auto cược"), parse_mode='HTML')
-    else:
-        bot.reply_to(message, format_message("ℹ️ Bot đã dừng, không có gì để tắt!"), parse_mode='HTML')
-
 @bot.message_handler(commands=['autocuoc'])
 def handle_autocuoc(message):
     user_id = str(message.from_user.id)
@@ -2349,7 +2234,6 @@ def handle_autocuoc(message):
         lc79_bot = None
     
     lc79_bot = LC79Bot()
-    lc79_bot.che_do = 2
     lc79_bot.bet_amount = bet_amount
     lc79_bot.target_profit = target_profit
     lc79_bot.initial_balance = 0
@@ -2416,7 +2300,7 @@ def handle_stopautocuoc(message):
         bot.reply_to(message, format_message("❌ Lệnh này chỉ dành cho VIP!\nNâng cấp lên VIP để sử dụng."), parse_mode='HTML')
         return
     
-    if lc79_bot and lc79_bot.betting_active and not lc79_bot.is_dudoan_mode:
+    if lc79_bot and lc79_bot.betting_active:
         lc79_bot.stop_auto_bet()
         bot_mode = "idle"
         profit = lc79_bot.balance - lc79_bot.initial_balance
@@ -2445,8 +2329,6 @@ def handle_stopautocuoc(message):
 📞 LIÊN HỆ: @Hahahhshah"""
             bot.send_message(chat_id, format_message(group_content), parse_mode='HTML')
         bot.reply_to(message, format_message("✅ Đã dừng auto cược! Xem chi tiết trong tin nhắn riêng."), parse_mode='HTML')
-    elif lc79_bot and lc79_bot.is_dudoan_mode:
-        bot.reply_to(message, format_message("ℹ️ Bot đang ở chế độ DỰ ĐOÁN\nDùng /stopdudoan để dừng"), parse_mode='HTML')
     else:
         bot.reply_to(message, format_message("ℹ️ Bot chưa chạy hoặc đã dừng"), parse_mode='HTML')
 
