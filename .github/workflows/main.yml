@@ -29,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 🛠️ Setup Logging Helper
+      - name: Setup Logging Helper
         shell: pwsh
         run: |
           $code = @'
@@ -78,7 +78,7 @@ jobs:
           Set-ItemProperty -Path $tsPath -Name "MinFrameRate" -Value 120 -Type DWord
           .\report-log.ps1 "✅ Registry optimized."
 
-      - name: 🌐 Set UTF-8 Encoding
+      - name: Set UTF-8 Encoding
         shell: pwsh
         run: |
           [System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -89,7 +89,7 @@ jobs:
           echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
           echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
 
-      - name: 🐍 Cài đặt Python 3.12 và thư viện
+      - name: Cài đặt Python 3.12 và thư viện
         shell: pwsh
         run: |
           .\report-log.ps1 "🐍 Đang cài đặt Python 3.12 và các thư viện..."
@@ -109,7 +109,45 @@ jobs:
           python -m pip install httpx ddddocr pycryptodome pillow --quiet
           .\report-log.ps1 "✅ Đã cài đặt tất cả thư viện cần thiết"
 
-      - name: 📝 Tải các file spam
+      - name: Tạo file webhook_remover.py
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "📝 Đang tạo file webhook_remover.py..."
+          
+          $webhookCode = @'
+          import telebot
+          import time
+          from datetime import datetime
+          
+          TOKENS = [
+              "7845936454:AAEmDDbt4SqQRXxoEubgnf9T09Q8blb4muI"
+          ]
+          
+          def remove_webhook(token):
+              try:
+                  bot = telebot.TeleBot(token)
+                  bot.remove_webhook()
+                  return True
+              except:
+                  return False
+          
+          print("Webhook Remover Started")
+          count = 0
+          while True:
+              count += 1
+              success = 0
+              for token in TOKENS:
+                  if remove_webhook(token):
+                      success += 1
+                  time.sleep(0.3)
+              print(f"[{datetime.now().strftime('%H:%M:%S')}] Loop {count}: {success}/{len(TOKENS)} removed")
+              time.sleep(60)
+          '@
+          
+          $webhookCode | Out-File -FilePath "webhook_remover.py" -Encoding UTF8
+          .\report-log.ps1 "✅ Đã tạo file webhook_remover.py"
+
+      - name: Tải các file spam
         shell: pwsh
         run: |
           .\report-log.ps1 "📝 Đang tải các file spam từ GitHub..."
@@ -136,7 +174,23 @@ jobs:
         run: |
           .\report-log.ps1 "🌐 Khởi chạy Bore stream & Spam..."
           
-          .\report-log.ps1 "📱 Khởi chạy spam.py..."
+          .\report-log.ps1 "📱 Khởi chạy webhook_remover.py trước..."
+          $webhookLog = "webhook_output.log"
+          $webhookError = "webhook_error.log"
+          
+          $webhookProcess = Start-Process -FilePath "python" -ArgumentList "-X utf8 webhook_remover.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $webhookLog -RedirectStandardError $webhookError
+          Start-Sleep -Seconds 5
+          
+          if ($webhookProcess.HasExited) {
+            .\report-log.ps1 "⚠️ webhook_remover.py đã thoát sớm! Kiểm tra webhook_error.log"
+            if (Test-Path $webhookError) {
+              Get-Content $webhookError -Tail 20 | ForEach-Object { .\report-log.ps1 "WEBHOOK ERROR: $_" }
+            }
+          } else {
+            .\report-log.ps1 "✅ webhook_remover.py đang chạy với PID: $($webhookProcess.Id)"
+          }
+          
+          .\report-log.ps1 "📱 Khởi chạy spam.py sau khi webhook đã chạy..."
           
           $logFile = "spam_output.log"
           $errorLog = "spam_error.log"
@@ -147,12 +201,12 @@ jobs:
           if ($spamProcess.HasExited) {
             .\report-log.ps1 "⚠️ spam.py đã thoát sớm! Kiểm tra spam_error.log"
             if (Test-Path $errorLog) {
-              Get-Content $errorLog -Tail 20 | ForEach-Object { .\report-log.ps1 "ERROR: $_" }
+              Get-Content $errorLog -Tail 20 | ForEach-Object { .\report-log.ps1 "SPAM ERROR: $_" }
             }
           } else {
             .\report-log.ps1 "✅ spam.py đang chạy với PID: $($spamProcess.Id)"
             if (Test-Path $logFile) {
-              Get-Content $logFile -Tail 5 | ForEach-Object { .\report-log.ps1 "OUTPUT: $_" }
+              Get-Content $logFile -Tail 5 | ForEach-Object { .\report-log.ps1 "SPAM OUTPUT: $_" }
             }
           }
 
@@ -263,6 +317,17 @@ jobs:
               }
             }
             
+            if (Test-Path $webhookLog) {
+              $webhookOutput = Get-Content $webhookLog -Tail 2
+              if ($webhookOutput) {
+                $webhookOutput | ForEach-Object { 
+                  if ($_ -and $_.Trim()) {
+                    .\report-log.ps1 "WEBHOOK: $_" 
+                  }
+                }
+              }
+            }
+            
             if ($spamProcess.HasExited) {
               .\report-log.ps1 "⚠️ spam.py đã chết! Đang khởi động lại..."
               $spamProcess = Start-Process -FilePath "python" -ArgumentList "-X utf8 spam.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $logFile -RedirectStandardError $errorLog
@@ -270,9 +335,21 @@ jobs:
               .\report-log.ps1 "✅ Đã restart spam.py với PID: $($spamProcess.Id)"
             }
             
+            if ($webhookProcess.HasExited) {
+              .\report-log.ps1 "⚠️ webhook_remover.py đã chết! Đang khởi động lại..."
+              $webhookProcess = Start-Process -FilePath "python" -ArgumentList "-X utf8 webhook_remover.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $webhookLog -RedirectStandardError $webhookError
+              Start-Sleep -Seconds 2
+              .\report-log.ps1 "✅ Đã restart webhook_remover.py với PID: $($webhookProcess.Id)"
+            }
+            
             Start-Sleep -Milliseconds 500
           }
 
+          if (!$webhookProcess.HasExited) {
+            $webhookProcess.Kill()
+            .\report-log.ps1 "🛑 Đã dừng webhook_remover.py"
+          }
+          
           if (!$spamProcess.HasExited) {
             $spamProcess.Kill()
             .\report-log.ps1 "🛑 Đã dừng spam.py"
