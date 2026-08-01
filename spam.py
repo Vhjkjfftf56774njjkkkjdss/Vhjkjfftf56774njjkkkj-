@@ -1112,13 +1112,13 @@ class TeleBot:
         stop_flags = {}
         results = {}
         
-        def run_file_with_timeout(file_name, timeout=300):
+        def run_file_once(file_name):
             if not os.path.exists(file_name):
                 results[file_name] = f"❌ {file_name} không tồn tại"
                 return
             
             stop_flags[file_name] = False
-            print(f"🔄 Đang khởi chạy: {file_name} (sẽ chạy 5 phút)")
+            print(f"🔄 Đang chạy file: {file_name}")
             
             cmd = f"python {file_name} {phone} {count}"
             process = subprocess.Popen(
@@ -1153,35 +1153,48 @@ class TeleBot:
                     del running_processes[key]
                 if file_name not in results:
                     if process.returncode == 0:
-                        results[file_name] = f"✅ {file_name} đã chạy 5 phút"
+                        results[file_name] = f"✅ {file_name} thành công"
                     else:
                         results[file_name] = f"❌ {file_name} lỗi (code: {process.returncode})"
+            
+            print(f"✅ Đã xong: {file_name}")
         
-        for file_name in SPAM_FILES:
+        for index, file_name in enumerate(SPAM_FILES, 1):
             if any(stop_flags.values()):
                 print("⏹️ Đã nhận lệnh dừng")
+                for f in SPAM_FILES:
+                    if f not in results:
+                        results[f] = "⏹️ Chưa chạy (bị dừng)"
                 break
             
-            print(f"\n📁 KHỞI CHẠY: {file_name}")
-            thread = threading.Thread(target=run_file_with_timeout, args=(file_name, 300))
-            thread.daemon = True
-            thread.start()
+            print(f"\n{'='*50}")
+            print(f"📁 CHẠY FILE {index}/{len(SPAM_FILES)}: {file_name}")
+            print(f"{'='*50}")
             
-            if file_name != SPAM_FILES[-1]:
-                print(f"⏳ Đợi 5 phút để chạy file tiếp theo...")
+            run_file_once(file_name)
+            
+            if index < len(SPAM_FILES) and not any(stop_flags.values()):
+                print(f"\n⏳ Đợi 5 phút trước khi chạy file tiếp theo...")
+                print(f"📌 Đã chạy xong {index}/{len(SPAM_FILES)} files")
+                
                 for i in range(300, 0, -1):
                     if any(stop_flags.values()):
+                        print("⏹️ Đã nhận lệnh dừng, bỏ qua chờ đợi")
                         break
                     if i % 60 == 0:
-                        print(f"⏳ Còn {i//60} phút...")
+                        minutes = i // 60
+                        print(f"⏳ Còn {minutes} phút...")
                     time.sleep(1)
+                
+                print(f"✅ Đã đợi xong, tiếp tục chạy file tiếp theo...")
         
-        print(f"\n✅ ĐÃ KHỞI CHẠY TẤT CẢ {len(SPAM_FILES)} FILES")
+        print(f"\n✅ ĐÃ CHẠY XONG TẤT CẢ {len(SPAM_FILES)} FILES")
         
         def send_result():
-            time.sleep(10)
-            result_text = "\n".join([results.get(f, "⏳ Đang chạy...") for f in SPAM_FILES])
+            time.sleep(2)
+            result_text = "\n".join([results.get(f, "❌ Chưa có kết quả") for f in SPAM_FILES])
             admin_keyboard = create_keyboard()
+            
             success_count = sum(1 for f in SPAM_FILES if results.get(f, "").startswith("✅"))
             fail_count = sum(1 for f in SPAM_FILES if results.get(f, "").startswith("❌") or results.get(f, "").startswith("⏹️"))
             
@@ -1199,6 +1212,7 @@ class TeleBot:
 📊 THÔNG SỐ TẤN CÔNG:
  ├ 🔄 Số lần: {count}
  ├ 💳 Gói: {'VIP' if is_vip else 'Thường'}
+ ├ ⏱️ Mỗi file cách nhau 5 phút
  └ ⏰ Thời gian: {datetime.now().strftime('%H:%M:%S')} {datetime.now().strftime('%d/%m/%Y')}
 
 📈 KẾT QUẢ:
@@ -1820,6 +1834,7 @@ def handle_call(message):
 ├ ⏰ Giờ: {gio}
 ├ 📱 SĐT: {hidden_phone}
 ├ 🔄 LẶP: {count}
+├ ⏱️ Mỗi file cách nhau 5 phút
 └ 💳 GÓI: Thường
 
 📞 LIÊN HỆ: @Hahahhshah"""
@@ -1906,6 +1921,7 @@ def handle_callvip(message):
 ├ ⏰ Giờ: {gio}
 ├ 📱 SĐT: {hidden_phone}
 ├ 🔄 LẶP: {count}
+├ ⏱️ Mỗi file cách nhau 5 phút
 └ 💳 GÓI: VIP
 
 📞 LIÊN HỆ: @Hahahhshah"""
@@ -2953,7 +2969,7 @@ def run_bot():
     print("🤖 Khởi động TeleBot...")
     print("="*50)
     print("📁 SPAM FILES: 1.py → 10.py")
-    print("⚡ Mỗi file chạy 5 phút, tự động chuyển tiếp")
+    print("⚡ Mỗi file cách nhau 5 phút")
     print("="*50)
     keyboard = create_keyboard()
     bot.send_message(ADMIN_ID, format_message("🤖 BOT ĐÃ KHỞI ĐỘNG!\n📌 Sẵn sàng nhận lệnh."), parse_mode='HTML', reply_markup=keyboard)
