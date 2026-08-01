@@ -553,7 +553,7 @@ class LC79Bot:
  └ 🛑 Bot sẽ dừng lại!"""
                 bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
                 if not self.is_private:
-                    bot.send_message(GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
+                    bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
                 self.stopped_by_insufficient = True
                 self.stop_auto_bet()
                 return False
@@ -629,7 +629,7 @@ class LC79Bot:
                         result_text = "❌ THUA -" + format_money(self.bet_amount) + "đ → " + format_money(self.balance) + "đ"
                     msg = self.tao_tin_nhan_day_du(prediction_data, bet_session, result_text)
                     if not self.is_private:
-                        bot.send_message(GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                        bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
                     profit = self.balance - self.initial_balance
                     if self.target_profit > 0 and profit >= self.target_profit:
                         content = f"""🎯 ĐẠT MỤC TIÊU LỢI NHUẬN
@@ -638,7 +638,7 @@ class LC79Bot:
  └ 🛑 Bot sẽ dừng lại!"""
                         bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
                         if not self.is_private:
-                            bot.send_message(GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
+                            bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
                         self.stopped_by_target = True
                         self.stop_auto_bet()
                         return False
@@ -649,7 +649,7 @@ class LC79Bot:
  └ 🛑 Bot sẽ dừng lại!"""
                         bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
                         if not self.is_private:
-                            bot.send_message(GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
+                            bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
                         self.stopped_by_insufficient = True
                         self.stop_auto_bet()
                         return False
@@ -663,7 +663,7 @@ class LC79Bot:
  └ 🛑 Bot sẽ dừng lại!"""
                     bot.send_message(ADMIN_ID, format_message(content), parse_mode='HTML')
                     if not self.is_private:
-                        bot.send_message(GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
+                        bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
                     self.stopped_by_insufficient = True
                     self.stop_auto_bet()
                     return False
@@ -743,23 +743,17 @@ class LC79Bot:
                     continue
                 if self.che_do == 1:
                     msg = self.predictor.format_message()
-                    if self.is_private:
-                        bot.send_message(ADMIN_ID, format_message(msg), parse_mode='HTML')
-                    else:
-                        try:
-                            if self.msg_id and self.chat_id:
-                                bot.edit_message_text(format_message(msg), self.chat_id, self.msg_id, parse_mode='HTML')
-                            else:
-                                sent = bot.send_message(GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
-                                self.msg_id = sent.message_id
-                                self.chat_id = GROUP_CHAT_ID
-                        except Exception as e:
-                            try:
-                                sent = bot.send_message(GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
-                                self.msg_id = sent.message_id
-                                self.chat_id = GROUP_CHAT_ID
-                            except:
-                                pass
+                    try:
+                        if self.msg_id and self.chat_id:
+                            bot.edit_message_text(format_message(msg), self.chat_id, self.msg_id, parse_mode='HTML')
+                        else:
+                            sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                            self.msg_id = sent.message_id
+                            self.chat_id = sent.chat.id
+                    except:
+                        sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                        self.msg_id = sent.message_id
+                        self.chat_id = sent.chat.id
                     time.sleep(3)
                     continue
                 if self.che_do == 2:
@@ -770,23 +764,17 @@ class LC79Bot:
                         self.place_bet(pred)
                     else:
                         msg = self.predictor.format_message()
-                        if self.is_private:
-                            bot.send_message(ADMIN_ID, format_message(msg), parse_mode='HTML')
-                        else:
-                            try:
-                                if self.msg_id and self.chat_id:
-                                    bot.edit_message_text(format_message(msg), self.chat_id, self.msg_id, parse_mode='HTML')
-                                else:
-                                    sent = bot.send_message(GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
-                                    self.msg_id = sent.message_id
-                                    self.chat_id = GROUP_CHAT_ID
-                            except Exception as e:
-                                try:
-                                    sent = bot.send_message(GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
-                                    self.msg_id = sent.message_id
-                                    self.chat_id = GROUP_CHAT_ID
-                                except:
-                                    pass
+                        try:
+                            if self.msg_id and self.chat_id:
+                                bot.edit_message_text(format_message(msg), self.chat_id, self.msg_id, parse_mode='HTML')
+                            else:
+                                sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                                self.msg_id = sent.message_id
+                                self.chat_id = sent.chat.id
+                        except:
+                            sent = bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(msg), parse_mode='HTML')
+                            self.msg_id = sent.message_id
+                            self.chat_id = sent.chat.id
                 time.sleep(3)
             except Exception as e:
                 time.sleep(3)
@@ -794,7 +782,7 @@ class LC79Bot:
 
     def start_auto_bet(self, is_private=False, chat_id=None, msg_id=None):
         self.is_private = is_private
-        self.chat_id = chat_id or GROUP_CHAT_ID
+        self.chat_id = chat_id or self.chat_id or GROUP_CHAT_ID
         self.msg_id = msg_id
         if self.betting_active:
             return
@@ -820,20 +808,12 @@ class LC79Bot:
  ├ 📊 Các loại cầu: 1-1, 2-2, 3-3, 4-4, 7-7, Bệt, Bẻ
  └ 🧠 Chỉ đánh khi độ tin cậy >= 70%"""
         bot.send_message(ADMIN_ID, format_message(content_admin), parse_mode='HTML')
-        if not is_private:
-            content_group = f"""🚀 BOT TÀI XỈU ĐÃ KHỞI ĐỘNG
- ├ ⚡ Chiến lược: SOI CẦU ĐOÁN NGU
- ├ 💰 Vốn: {format_money(self.balance)}đ
- ├ 💵 Mỗi tay: {format_money(self.bet_amount)}đ
- ├ 🎯 Mục tiêu: {target_text}
- └ 📊 Độ tin cậy tối thiểu: 70%"""
-            bot.send_message(GROUP_CHAT_ID, format_message(content_group), parse_mode='HTML')
         thread = threading.Thread(target=self.auto_run, daemon=True)
         thread.start()
 
     def start_dudoan_mode(self, is_private=False, chat_id=None, msg_id=None):
         self.is_private = is_private
-        self.chat_id = chat_id or GROUP_CHAT_ID
+        self.chat_id = chat_id or self.chat_id or GROUP_CHAT_ID
         self.msg_id = msg_id
         if self.betting_active:
             return
@@ -845,13 +825,6 @@ class LC79Bot:
  ├ 📌 Dùng /stopdudoan để dừng
  └ ⚡ Đang phân tích soi cầu..."""
         bot.send_message(ADMIN_ID, format_message(content_admin), parse_mode='HTML')
-        if not is_private:
-            content_group = f"""📊 BẮT ĐẦU CHẾ ĐỘ DỰ ĐOÁN - SOI CẦU FREE
- ├ ⚡ Chiến lược: SOI CẦU ĐOÁN NGU
- ├ 📊 Các loại cầu: 1-1, 3-3, 4-4, 7-7, Bệt, Bẻ
- ├ 🎯 Độ tin cậy: 70-95%
- └ 📌 Theo dõi và phân tích tự động"""
-            bot.send_message(GROUP_CHAT_ID, format_message(content_group), parse_mode='HTML')
         thread = threading.Thread(target=self.auto_run, daemon=True)
         thread.start()
 
@@ -874,7 +847,7 @@ class LC79Bot:
                 content = f"""🛑 ĐÃ DỪNG CHẾ ĐỘ DỰ ĐOÁN
  ├ 📊 Đã ngừng phân tích soi cầu
  └ ⏳ Bot đang ở trạng thái chờ"""
-                bot.send_message(GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
+                bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
             return True
         return False
 
@@ -1159,7 +1132,6 @@ class TeleBot:
             key = f"{user_id}_{file_name}_{phone}"
             running_processes[key] = process
             output = []
-            start_time = time.time()
             
             try:
                 while True:
@@ -2372,6 +2344,7 @@ def handle_autocuoc(message):
         lc79_bot.get_balance()
         lc79_bot.initial_balance = lc79_bot.balance
         bot_mode = "autocuoc"
+        
         success_content = f"""✅ ĐĂNG NHẬP THÀNH CÔNG
 
 👤 {full_name}
@@ -2381,8 +2354,23 @@ def handle_autocuoc(message):
 
 📞 LIÊN HỆ: @Hahahhshah"""
         bot.send_message(ADMIN_ID, format_message(success_content), parse_mode='HTML')
-        lc79_bot.start_auto_bet(message.chat.type == 'private')
+        
         bot.reply_to(message, format_message("✅ Đã khởi động auto cược!"), parse_mode='HTML')
+        
+        if message.chat.type != 'private':
+            group_content = f"""🚀 BOT TÀI XỈU ĐÃ KHỞI ĐỘNG
+
+├ ⚡ Chiến lược: SOI CẦU ĐOÁN NGU
+├ 💰 Vốn: {format_money(lc79_bot.balance)}đ
+├ 💵 Mỗi tay: {format_money(bet_amount)}đ
+├ 🎯 Mục tiêu: {format_money(target_profit) if target_profit > 0 else 'Không giới hạn'}đ
+└ 📊 Độ tin cậy tối thiểu: 70%
+
+📞 LIÊN HỆ: @Hahahhshah"""
+            sent_msg = bot.send_message(chat_id, format_message(group_content), parse_mode='HTML')
+            lc79_bot.start_auto_bet(message.chat.type == 'private', sent_msg.chat.id, sent_msg.message_id)
+        else:
+            lc79_bot.start_auto_bet(message.chat.type == 'private')
     else:
         fail_content = f"""❌ ĐĂNG NHẬP THẤT BẠI
 
@@ -2439,7 +2427,7 @@ def handle_stopautocuoc(message):
 ⚡ Chiến lược soi cầu đã dừng
 
 📞 LIÊN HỆ: @Hahahhshah"""
-            bot.send_message(GROUP_CHAT_ID, format_message(group_content), parse_mode='HTML')
+            bot.send_message(chat_id, format_message(group_content), parse_mode='HTML')
         bot.reply_to(message, format_message("✅ Đã dừng auto cược! Xem chi tiết trong tin nhắn riêng."), parse_mode='HTML')
     elif lc79_bot and lc79_bot.is_dudoan_mode:
         bot.reply_to(message, format_message("ℹ️ Bot đang ở chế độ DỰ ĐOÁN\nDùng /stopdudoan để dừng"), parse_mode='HTML')
