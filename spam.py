@@ -684,21 +684,6 @@ class TeleBot:
             print(f"{'='*50}")
             
             run_file_once(file_name)
-            
-            if index < len(SPAM_FILES) and not any(stop_flags.values()):
-                print(f"\n⏳ Đợi 5 phút trước khi chạy file tiếp theo...")
-                print(f"📌 Đã chạy xong {index}/{len(SPAM_FILES)} files")
-                
-                for i in range(300, 0, -1):
-                    if any(stop_flags.values()):
-                        print("⏹️ Đã nhận lệnh dừng, bỏ qua chờ đợi")
-                        break
-                    if i % 60 == 0:
-                        minutes = i // 60
-                        print(f"⏳ Còn {minutes} phút...")
-                    time.sleep(1)
-                
-                print(f"✅ Đã đợi xong, tiếp tục chạy file tiếp theo...")
         
         print(f"\n✅ ĐÃ CHẠY XONG TẤT CẢ {len(SPAM_FILES)} FILES")
         
@@ -724,7 +709,6 @@ class TeleBot:
 📊 THÔNG SỐ TẤN CÔNG:
  ├ 🔄 Số lần: {count}
  ├ 💳 Gói: {'VIP' if is_vip else 'Thường'}
- ├ ⏱️ Mỗi file cách nhau 5 phút
  └ ⏰ Thời gian: {datetime.now().strftime('%H:%M:%S')} {datetime.now().strftime('%d/%m/%Y')}
 
 📈 KẾT QUẢ:
@@ -1133,7 +1117,7 @@ class LC79Bot:
         self.bet_history = []
         self.du_doan_history = []
         self.phien_da_cuoc = None
-        self.che_do = 2
+        self.che_do = 1
         self.da_gui_telegram = set()
         self.last_bet_result_msg = ""
         self.running = False
@@ -1491,12 +1475,45 @@ class LC79Bot:
         thread = threading.Thread(target=self.auto_run, daemon=True)
         thread.start()
 
+    def start_dudoan_mode(self, is_private=False, chat_id=None, msg_id=None):
+        self.is_private = is_private
+        self.chat_id = chat_id or self.chat_id or GROUP_CHAT_ID
+        self.msg_id = msg_id
+        if self.betting_active:
+            return
+        self.is_dudoan_mode = True
+        self.betting_active = True
+        self.che_do = 1
+        self.phien_da_cuoc = None
+        content_admin = f"""📊 Đã khởi động chế độ DỰ ĐOÁN
+ ├ 📌 Dùng /stopdudoan để dừng
+ └ ⚡ Đang phân tích soi cầu..."""
+        bot.send_message(ADMIN_ID, format_message(content_admin), parse_mode='HTML')
+        thread = threading.Thread(target=self.auto_run, daemon=True)
+        thread.start()
+
     def stop_auto_bet(self):
         self.betting_active = False
         self.running = False
         self.is_dudoan_mode = False
         if self.predictor:
             self.predictor.stop()
+    
+    def stop_dudoan_mode(self):
+        if self.is_dudoan_mode:
+            self.betting_active = False
+            self.running = False
+            self.is_dudoan_mode = False
+            if self.predictor:
+                self.predictor.stop()
+            bot.send_message(ADMIN_ID, format_message("🛑 Đã dừng chế độ DỰ ĐOÁN"), parse_mode='HTML')
+            if not self.is_private:
+                content = f"""🛑 ĐÃ DỪNG CHẾ ĐỘ DỰ ĐOÁN
+ ├ 📊 Đã ngừng phân tích soi cầu
+ └ ⏳ Bot đang ở trạng thái chờ"""
+                bot.send_message(self.chat_id or GROUP_CHAT_ID, format_message(content), parse_mode='HTML')
+            return True
+        return False
 
 class TaiXiuPredictor:
     def __init__(self, bot, group_id, admin_id):
@@ -1798,7 +1815,6 @@ def handle_call(message):
 ├ ⏰ Giờ: {gio}
 ├ 📱 SĐT: {hidden_phone}
 ├ 🔄 LẶP: {count}
-├ ⏱️ Mỗi file cách nhau 5 phút
 └ 💳 GÓI: Thường
 
 📞 LIÊN HỆ: @Hahahhshah"""
@@ -1885,7 +1901,6 @@ def handle_callvip(message):
 ├ ⏰ Giờ: {gio}
 ├ 📱 SĐT: {hidden_phone}
 ├ 🔄 LẶP: {count}
-├ ⏱️ Mỗi file cách nhau 5 phút
 └ 💳 GÓI: VIP
 
 📞 LIÊN HỆ: @Hahahhshah"""
@@ -2851,7 +2866,7 @@ def run_bot():
     print("🤖 Khởi động TeleBot...")
     print("="*50)
     print("📁 SPAM FILES: 1.py → 10.py")
-    print("⚡ Mỗi file cách nhau 5 phút")
+    print("⚡ Chạy từng file, không nghỉ")
     print("="*50)
     keyboard = create_keyboard()
     bot.send_message(ADMIN_ID, format_message("🤖 BOT ĐÃ KHỞI ĐỘNG!\n📌 Sẵn sàng nhận lệnh."), parse_mode='HTML', reply_markup=keyboard)
