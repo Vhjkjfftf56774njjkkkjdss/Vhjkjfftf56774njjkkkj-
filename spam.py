@@ -40,8 +40,6 @@ BET_HISTORY_FILE = os.path.join(FOLDER_DATA, "bet_history.json")
 USERS_FILE = os.path.join(FOLDER_DATA, "users.json")
 VIP_FILE = os.path.join(FOLDER_DATA, "vip_users.json")
 RDP_FILE = os.path.join(FOLDER_DATA, "rdp_info.txt")
-ACTIVE_TASKS_FILE = os.path.join(FOLDER_DATA, "active_tasks.json")
-LOCKET_HISTORY_FILE = os.path.join(FOLDER_DATA, "locket_history.json")
 
 bot = telebot.TeleBot(BOT_TOKEN)
 bot_mode = "normal"
@@ -66,8 +64,6 @@ tx_data = {
 }
 lc79_bot = None
 vip_users = {}
-active_tasks = {}
-locket_history = {}
 
 ua = UserAgent()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -180,307 +176,6 @@ def save_bet_history(history):
     except Exception as e:
         print(f"❌ Lỗi lưu bet_history.json: {e}")
 
-def load_locket_history():
-    global locket_history
-    try:
-        if os.path.exists(LOCKET_HISTORY_FILE):
-            with open(LOCKET_HISTORY_FILE, 'r', encoding='utf-8') as f:
-                locket_history = json.load(f)
-        else:
-            locket_history = {}
-            save_locket_history()
-    except:
-        locket_history = {}
-
-def save_locket_history():
-    try:
-        with open(LOCKET_HISTORY_FILE, 'w', encoding='utf-8') as f:
-            json.dump(locket_history, f, indent=2, ensure_ascii=False)
-        try:
-            subprocess.run(['git', 'add', LOCKET_HISTORY_FILE], check=True, capture_output=True)
-            subprocess.run(['git', 'commit', '-m', f'🔄 Update Locket History: {datetime.now().strftime("%H:%M:%S %d/%m/%Y")} [skip ci]'], check=True, capture_output=True)
-            subprocess.run(['git', 'push', 'origin', 'main', '--force'], check=True, capture_output=True)
-            print("✅ Đã commit locket_history.json lên repo")
-        except Exception as e:
-            print(f"⚠️ Lỗi push locket_history.json: {e}")
-    except Exception as e:
-        print(f"❌ Lỗi lưu locket_history.json: {e}")
-
-def load_active_tasks():
-    global active_tasks
-    try:
-        if os.path.exists(ACTIVE_TASKS_FILE):
-            with open(ACTIVE_TASKS_FILE, 'r', encoding='utf-8') as f:
-                tasks_data = json.load(f)
-                for username, task_info in tasks_data.items():
-                    if username not in active_tasks:
-                        active_tasks[username] = {
-                            "stop": {"stop": False},
-                            "chat_id": task_info.get("chat_id"),
-                            "msg_id": task_info.get("msg_id"),
-                            "start_time": task_info.get("start_time", time.time()),
-                            "total_rounds": task_info.get("total_rounds", 0),
-                            "total_success": task_info.get("total_success", 0),
-                            "user_id": task_info.get("user_id", "unknown")
-                        }
-    except:
-        pass
-
-def save_active_tasks():
-    try:
-        tasks_data = {}
-        for username, task_info in active_tasks.items():
-            tasks_data[username] = {
-                "chat_id": task_info.get("chat_id"),
-                "msg_id": task_info.get("msg_id"),
-                "start_time": task_info.get("start_time", time.time()),
-                "total_rounds": task_info.get("total_rounds", 0),
-                "total_success": task_info.get("total_success", 0),
-                "user_id": task_info.get("user_id", "unknown")
-            }
-        with open(ACTIVE_TASKS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(tasks_data, f, indent=2, ensure_ascii=False)
-        try:
-            subprocess.run(['git', 'add', ACTIVE_TASKS_FILE], check=True, capture_output=True)
-            subprocess.run(['git', 'commit', '-m', f'🔄 Update Active Tasks: {datetime.now().strftime("%H:%M:%S %d/%m/%Y")} [skip ci]'], check=True, capture_output=True)
-            subprocess.run(['git', 'push', 'origin', 'main', '--force'], check=True, capture_output=True)
-            print("✅ Đã commit active_tasks.json lên repo")
-        except Exception as e:
-            print(f"⚠️ Lỗi push active_tasks.json: {e}")
-    except Exception as e:
-        print(f"❌ Lỗi lưu active_tasks.json: {e}")
-
-def add_locket_history(username, data):
-    global locket_history
-    if username not in locket_history:
-        locket_history[username] = []
-    locket_history[username].append({
-        "timestamp": time.time(),
-        "datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        **data
-    })
-    if len(locket_history[username]) > 1000:
-        locket_history[username] = locket_history[username][-1000:]
-    save_locket_history()
-
-def remove_active_task(username):
-    if username in active_tasks:
-        del active_tasks[username]
-        save_active_tasks()
-
-class LocketTool:
-    def __init__(self):
-        self.base_url = "https://locket-tu-xa.vercel.app"
-        self.headers = {
-            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-            'accept-language': 'vi-VN',
-            'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36',
-            'sec-ch-ua': '"Chromium";v="127", "Not)A;Brand";v="99", "Microsoft Edge Simulate";v="127", "Lemur";v="127"',
-            'sec-ch-ua-mobile': '?1',
-            'sec-ch-ua-platform': '"Android"',
-        }
-        self.session = requests.Session()
-        self.session.headers.update(self.headers)
-        
-    def get_main_page(self) -> bool:
-        try:
-            response = self.session.get(f"{self.base_url}/")
-            return response.status_code == 200
-        except:
-            return False
-    
-    def get_user_info(self, username: str) -> Optional[Dict[str, Any]]:
-        try:
-            response = self.session.post(
-                f"{self.base_url}/api/get-user-info",
-                headers={
-                    'content-type': 'application/json',
-                    'origin': self.base_url,
-                    'referer': f"{self.base_url}/",
-                    'accept': '*/*'
-                },
-                json={"username": username}
-            )
-            if response.status_code == 200:
-                return response.json()
-            return None
-        except:
-            return None
-    
-    def restore_user(self, username: str) -> Optional[Dict[str, Any]]:
-        try:
-            response = self.session.post(
-                f"{self.base_url}/api/restore",
-                headers={
-                    'content-type': 'application/json',
-                    'origin': self.base_url,
-                    'referer': f"{self.base_url}/",
-                    'accept': '*/*'
-                },
-                json={"username": username}
-            )
-            if response.status_code == 200:
-                return response.json()
-            return None
-        except:
-            return None
-    
-    def get_queue_status(self, client_id: str, max_retries: int = 30, delay: int = 2) -> Optional[Dict[str, Any]]:
-        for attempt in range(max_retries):
-            try:
-                response = self.session.post(
-                    f"{self.base_url}/api/queue/status",
-                    headers={
-                        'content-type': 'application/json',
-                        'origin': self.base_url,
-                        'referer': f"{self.base_url}/",
-                        'accept': '*/*'
-                    },
-                    json={"client_id": client_id}
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get('status') in ['completed', 'error']:
-                        return data
-                else:
-                    return None
-            except:
-                return None
-            if attempt < max_retries - 1:
-                time.sleep(delay)
-        return None
-    
-    def process_user(self, username: str) -> Dict[str, Any]:
-        result = {
-            "success": False,
-            "email": None,
-            "product": None,
-            "expires": None,
-            "uid": None,
-            "message": ""
-        }
-        if not self.get_main_page():
-            result["message"] = "Không thể truy cập trang chính"
-            return result
-        user_info = self.get_user_info(username)
-        if not user_info:
-            result["message"] = f"Không thể lấy thông tin user @{username}"
-            return result
-        restore_result = self.restore_user(username)
-        if not restore_result:
-            result["message"] = f"Không thể khôi phục user @{username}"
-            return result
-        client_id = restore_result.get('client_id')
-        if not client_id:
-            result["message"] = "Không tìm thấy client_id"
-            return result
-        final_status = self.get_queue_status(client_id)
-        if final_status and final_status.get('status') == 'completed':
-            result["success"] = True
-            result["email"] = final_status.get('email', 'N/A')
-            result["product"] = final_status.get('product', 'N/A')
-            result["expires"] = final_status.get('expires', 'N/A')
-            result["uid"] = final_status.get('uid', 'N/A')
-            result["message"] = "Kích hoạt thành công"
-        else:
-            result["message"] = "Kích hoạt thất bại"
-        return result
-
-def run_locked_continuous(target_username, chat_id, msg_id, stop_flag, user_id):
-    total_rounds = 0
-    total_success = 0
-    
-    if target_username in active_tasks:
-        active_tasks[target_username]["start_time"] = time.time()
-        save_active_tasks()
-    
-    while not stop_flag["stop"]:
-        total_rounds += 1
-        round_start = time.time()
-        
-        tool = LocketTool()
-        result = tool.process_user(target_username)
-        
-        round_time = round(time.time() - round_start, 2)
-        
-        if target_username in active_tasks:
-            active_tasks[target_username]["total_rounds"] = total_rounds
-            if result.get("success"):
-                active_tasks[target_username]["total_success"] = total_success + 1
-            save_active_tasks()
-        
-        if result.get("success"):
-            total_success += 1
-            add_locket_history(target_username, {
-                "success": True,
-                "round": total_rounds,
-                "email": result.get('email'),
-                "product": result.get('product'),
-                "expires": result.get('expires'),
-                "uid": result.get('uid'),
-                "user_id": user_id
-            })
-            
-            report = f"""<blockquote>✅ KÍCH HOẠT THÀNH CÔNG
-├ 📅 THỜI GIAN: {datetime.now().strftime('%H:%M:%S %d/%m/%Y')}
-├ 👤 USERNAME: @{target_username}
-├ 🔄 LẦN CHẠY: {total_rounds}
-├ ⏱️ THỜI GIAN: {round_time}s
-├ 📊 THÀNH CÔNG: {total_success} lần
-├ ─────────────────────
-├ 🎉 <b>CHI TIẾT:</b>
-├ 📧 Email: {result.get('email')}
-├ 📦 Gói: {result.get('product')}
-├ 📅 Hết hạn: {result.get('expires')}
-├ 🆔 UID: {result.get('uid')}
-└ 📌 TỔNG KẾT: {total_success}/{total_rounds}
-</blockquote>"""
-        else:
-            add_locket_history(target_username, {
-                "success": False,
-                "round": total_rounds,
-                "message": result.get('message', 'Không xác định'),
-                "user_id": user_id
-            })
-            
-            report = f"""<blockquote>❌ KÍCH HOẠT THẤT BẠI
-├ 📅 THỜI GIAN: {datetime.now().strftime('%H:%M:%S %d/%m/%Y')}
-├ 👤 USERNAME: @{target_username}
-├ 🔄 LẦN CHẠY: {total_rounds}
-├ ⏱️ THỜI GIAN: {round_time}s
-├ 📊 THÀNH CÔNG: {total_success} lần
-├ ─────────────────────
-├ ⚠️ LÝ DO: {result.get('message', 'Không xác định')}
-└ 📌 TỔNG KẾT: {total_success}/{total_rounds}
-</blockquote>"""
-        
-        try:
-            bot.edit_message_text(report, chat_id, msg_id, parse_mode='HTML')
-        except:
-            sent_msg = bot.send_message(chat_id, report, parse_mode='HTML')
-            msg_id = sent_msg.message_id
-            if target_username in active_tasks:
-                active_tasks[target_username]["msg_id"] = msg_id
-                save_active_tasks()
-        
-        if not stop_flag["stop"]:
-            time.sleep(2)
-    
-    final_report = f"""<blockquote>🛑 ĐÃ DỪNG KÍCH HOẠT 🛑
-├ 👤 USER: @{target_username}
-├ 🔄 TỔNG LẦN CHẠY: {total_rounds}
-├ ✅ TỔNG THÀNH CÔNG: {total_success}
-├ ─────────────────────
-└ 📞 LIÊN HỆ: @Hahahhshah
-</blockquote>"""
-    
-    try:
-        bot.edit_message_text(final_report, chat_id, msg_id, parse_mode='HTML')
-    except:
-        bot.send_message(chat_id, final_report, parse_mode='HTML')
-    
-    remove_active_task(target_username)
-
 class TeleBot:
     def __init__(self):
         self.info_file = RDP_FILE
@@ -493,8 +188,6 @@ class TeleBot:
         self.last_rdp = None
         load_users()
         load_vip_users()
-        load_locket_history()
-        load_active_tasks()
         
     def hide_phone(self, phone):
         if len(phone) >= 10:
@@ -1695,11 +1388,10 @@ def handle_start(message):
  ├ /tiktok [username] - Lấy thông tin TikTok (FREE)
  ├ /muavip - Xem giá VIP
  ├ /history - Lịch sử
+ ├ /dudoan - Chế độ dự đoán Tài Xỉu (FREE)
  ├ /autocuoc - Auto cược Tài Xỉu (VIP)
  ├ /stopautocuoc - Dừng auto cược
- ├ /locked [username] - Kích hoạt Locket Gold (VIP)
- ├ /stoplocked [username] - Dừng kích hoạt Locket
- ├ /lhistory - Lịch sử Locket
+ ├ /stopdudoan - Dừng dự đoán
  └ /help - Xem hướng dẫn
 
 📌 TRẠNG THÁI HIỆN TẠI: <b>{bot_mode.upper()}</b>
@@ -1729,14 +1421,13 @@ def handle_help(message):
  ├ /tiktok [username] - Lấy thông tin TikTok
  ├ /muavip - Xem giá VIP
  ├ /history - Lịch sử
+ ├ /dudoan - Chế độ dự đoán Tài Xỉu (FREE)
  └ /autocuoc - Auto cược Tài Xỉu (VIP)
 
 👑 LỆNH VIP:
  ├ /autocuoc - Auto cược Tài Xỉu
  ├ /stopautocuoc - Dừng auto cược
- ├ /locked [username] - Kích hoạt Locket Gold
- ├ /stoplocked [username] - Dừng kích hoạt Locket
- └ /lhistory - Lịch sử Locket
+ └ /stopdudoan - Dừng dự đoán
 
 👑 LỆNH ADMIN:
  ├ /adduser [id] [ngày] - Thêm user
@@ -2175,6 +1866,85 @@ def handle_history(message):
     content += f"\n📞 LIÊN HỆ: @Hahahhshah"
     bot.reply_to(message, format_message(content), parse_mode='HTML')
 
+@bot.message_handler(commands=['dudoan'])
+def handle_dudoan(message):
+    user_id = str(message.from_user.id)
+    chat_id = message.chat.id
+    global lc79_bot, bot_mode
+    
+    if user_id in banned_users:
+        bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
+        return
+    
+    if not bot_instance.check_user(user_id):
+        bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!\n📞 Liên hệ @Hahahhshah để mua key."), parse_mode='HTML')
+        return
+    
+    if lc79_bot and (lc79_bot.is_dudoan_mode or lc79_bot.betting_active):
+        if lc79_bot.is_dudoan_mode:
+            bot.reply_to(message, format_message("ℹ️ Chế độ dự đoán đang chạy, không cần khởi động lại!"), parse_mode='HTML')
+        else:
+            bot.reply_to(message, format_message("ℹ️ Bot auto cược đang chạy! Vui lòng dùng /stopautocuoc để dừng trước."), parse_mode='HTML')
+        return
+    
+    if lc79_bot:
+        lc79_bot.stop_auto_bet()
+        lc79_bot = None
+    
+    lc79_bot = LC79Bot()
+    bot_mode = "dudoan"
+    
+    content = f"""📊 ĐÃ KHỞI ĐỘNG CHẾ ĐỘ THEO DÕI - SOI CẦU ĐOÁN NGU (FREE)
+
+⚡ Phân tích các loại cầu:
+ ├ 1-1, 3-3, 4-4, 7-7
+ ├ Bệt, Bẻ, XTT/TXX
+ └ Độ tin cậy từ 70-95%
+
+📌 Dùng /stopdudoan để dừng chế độ dự đoán
+
+📞 LIÊN HỆ: @Hahahhshah"""
+    sent_msg = bot.reply_to(message, format_message(content), parse_mode='HTML')
+    lc79_bot.start_dudoan_mode(message.chat.type == 'private', sent_msg.chat.id, sent_msg.message_id)
+
+@bot.message_handler(commands=['stopdudoan'])
+def handle_stopdudoan(message):
+    user_id = str(message.from_user.id)
+    chat_id = message.chat.id
+    global lc79_bot, bot_mode
+    
+    if user_id in banned_users:
+        bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
+        return
+    
+    if not bot_instance.check_user(user_id):
+        bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!"), parse_mode='HTML')
+        return
+    
+    if not bot_instance.check_vip(user_id):
+        bot.reply_to(message, format_message("❌ Lệnh này chỉ dành cho VIP!\nNâng cấp lên VIP để sử dụng."), parse_mode='HTML')
+        return
+    
+    if not lc79_bot:
+        bot.reply_to(message, format_message("ℹ️ Chưa có bot nào đang chạy!"), parse_mode='HTML')
+        return
+    
+    if lc79_bot.is_dudoan_mode:
+        if lc79_bot.stop_dudoan_mode():
+            bot_mode = "idle"
+            content = f"""🛑 ĐÃ DỪNG CHẾ ĐỘ DỰ ĐOÁN
+
+📊 Đã ngừng phân tích soi cầu
+⏳ Bot đang ở trạng thái chờ
+📌 Dùng /dudoan để khởi động lại khi cần
+
+📞 LIÊN HỆ: @Hahahhshah"""
+            bot.reply_to(message, format_message(content), parse_mode='HTML')
+    elif lc79_bot.betting_active:
+        bot.reply_to(message, format_message("ℹ️ Bot đang ở chế độ AUTO CƯỢC\nDùng /stopautocuoc để dừng auto cược"), parse_mode='HTML')
+    else:
+        bot.reply_to(message, format_message("ℹ️ Bot đã dừng, không có gì để tắt!"), parse_mode='HTML')
+
 @bot.message_handler(commands=['autocuoc'])
 def handle_autocuoc(message):
     user_id = str(message.from_user.id)
@@ -2346,154 +2116,6 @@ def handle_stopautocuoc(message):
         bot.reply_to(message, format_message("✅ Đã dừng auto cược! Xem chi tiết trong tin nhắn riêng."), parse_mode='HTML')
     else:
         bot.reply_to(message, format_message("ℹ️ Bot chưa chạy hoặc đã dừng"), parse_mode='HTML')
-
-@bot.message_handler(commands=['locked'])
-def handle_locked(message):
-    user_id = str(message.from_user.id)
-    chat_id = message.chat.id
-    
-    if user_id in banned_users:
-        bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
-        return
-    
-    if not bot_instance.check_user(user_id):
-        bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!\n📞 Liên hệ @Hahahhshah để mua key."), parse_mode='HTML')
-        return
-    
-    if not bot_instance.check_vip(user_id):
-        bot.reply_to(message, format_message("❌ Bạn không phải VIP!\nNâng cấp lên VIP để sử dụng lệnh này."), parse_mode='HTML')
-        return
-    
-    parts = message.text.split()
-    if len(parts) != 2:
-        content = """<blockquote>❌ LỖI CÚ PHÁP
-├ ─────────────────────
-├ 📌 CÁCH DÙNG: /locked username
-└ 💡 <i>Ví dụ: /locked john_doe</i>
-</blockquote>"""
-        bot.reply_to(message, content, parse_mode='HTML')
-        return
-    
-    target_username = parts[1]
-    
-    if target_username in active_tasks:
-        content = f"""<blockquote>⚠️ CẢNH BÁO
-├ 👤 Đang kích hoạt cho @{target_username}
-├ ─────────────────────
-└ 💡 Dùng /stoplocked {target_username} để dừng
-</blockquote>"""
-        bot.reply_to(message, content, parse_mode='HTML')
-        return
-    
-    init_msg = f"""<blockquote>🚀 BẮT ĐẦU KÍCH HOẠT 🚀
-├ 👤 TARGET: @{target_username}
-├ 🔄 CHẾ ĐỘ: Tự động liên tục
-├ ⏳ TRẠNG THÁI: Đang xử lý...
-├ ─────────────────────
-└ 💡 Bot sẽ cập nhật kết quả tại đây
-</blockquote>"""
-    
-    sent_msg = bot.send_message(chat_id, init_msg, parse_mode='HTML')
-    msg_id = sent_msg.message_id
-    
-    stop_flag = {"stop": False}
-    active_tasks[target_username] = {
-        "stop": stop_flag,
-        "chat_id": chat_id,
-        "msg_id": msg_id,
-        "start_time": time.time(),
-        "total_rounds": 0,
-        "total_success": 0,
-        "user_id": user_id
-    }
-    save_active_tasks()
-    
-    thread = threading.Thread(target=run_locked_continuous, args=(target_username, chat_id, msg_id, stop_flag, user_id))
-    thread.daemon = True
-    thread.start()
-
-@bot.message_handler(commands=['stoplocked'])
-def handle_stoplocked(message):
-    user_id = str(message.from_user.id)
-    chat_id = message.chat.id
-    
-    if user_id in banned_users:
-        bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
-        return
-    
-    if not bot_instance.check_user(user_id):
-        bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!"), parse_mode='HTML')
-        return
-    
-    if not bot_instance.check_vip(user_id):
-        bot.reply_to(message, format_message("❌ Bạn không phải VIP!\nNâng cấp lên VIP để sử dụng lệnh này."), parse_mode='HTML')
-        return
-    
-    parts = message.text.split()
-    if len(parts) != 2:
-        content = """<blockquote>❌ LỖI CÚ PHÁP
-├ ─────────────────────
-├ 📌 CÁCH DÙNG: /stoplocked username
-└ 💡 <i>Ví dụ: /stoplocked john_doe</i>
-</blockquote>"""
-        bot.reply_to(message, content, parse_mode='HTML')
-        return
-    
-    target_username = parts[1]
-    
-    if target_username in active_tasks:
-        active_tasks[target_username]["stop"]["stop"] = True
-        content = f"""<blockquote>🛑 ĐÃ YÊU CẦU DỪNG
-├ 👤 USER: @{target_username}
-├ ─────────────────────
-└ ✅ Sẽ dừng sau khi hoàn thành lần chạy hiện tại
-</blockquote>"""
-        bot.reply_to(message, content, parse_mode='HTML')
-    else:
-        content = f"""<blockquote>⚠️ KHÔNG TÌM THẤY
-├ 👤 USER: @{target_username}
-├ ─────────────────────
-└ 💡 Không có tiến trình nào cho user này
-</blockquote>"""
-        bot.reply_to(message, content, parse_mode='HTML')
-
-@bot.message_handler(commands=['lhistory'])
-def handle_lhistory(message):
-    user_id = str(message.from_user.id)
-    chat_id = message.chat.id
-    
-    if user_id in banned_users:
-        bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
-        return
-    
-    if not bot_instance.check_user(user_id):
-        bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng bot!"), parse_mode='HTML')
-        return
-    
-    if not bot_instance.check_vip(user_id):
-        bot.reply_to(message, format_message("❌ Bạn không phải VIP!\nNâng cấp lên VIP để sử dụng lệnh này."), parse_mode='HTML')
-        return
-    
-    history = locket_history.get(user_id, [])
-    if not history:
-        content = """<blockquote>📋 LỊCH SỬ LOCKET
-├ ─────────────────────
-└ 📊 Chưa có lịch sử kích hoạt
-</blockquote>"""
-        bot.reply_to(message, content, parse_mode='HTML')
-        return
-    
-    content = f"<blockquote>📋 LỊCH SỬ LOCKET ({len(history)})\n"
-    for i, entry in enumerate(history[-20:], 1):
-        status = "✅" if entry.get("success") else "❌"
-        content += f"├ {status} {entry.get('datetime')} - @{entry.get('username', 'N/A')}\n"
-        if entry.get("success"):
-            content += f"│  └ 📧 {entry.get('email')} - 🆔 {entry.get('uid')}\n"
-        else:
-            content += f"│  └ ⚠️ {entry.get('message', 'Thất bại')}\n"
-    content += f"└ 📊 TỔNG: {len(history)} bản ghi\n</blockquote>"
-    
-    bot.reply_to(message, content, parse_mode='HTML')
 
 @bot.message_handler(commands=['adduser'])
 def handle_adduser(message):
