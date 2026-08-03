@@ -278,6 +278,18 @@ class TeleBot:
                 if bot_running:
                     time.sleep(5)
 
+    def delete_user_message(self, message):
+        try:
+            bot.delete_message(message.chat.id, message.message_id)
+        except:
+            pass
+
+    def delete_user_message_after_delay(self, message, delay=0.1):
+        def _delete():
+            time.sleep(delay)
+            self.delete_user_message(message)
+        threading.Thread(target=_delete, daemon=True).start()
+
     def run_spam_file(self, file_name, phone, count, user_id):
         if file_name in stop_flags and stop_flags[file_name]:
             return f"⏹️ Đã dừng {file_name}"
@@ -341,6 +353,10 @@ class TeleBot:
             try:
                 while True:
                     if file_name in stop_flags and stop_flags[file_name]:
+                        process.terminate()
+                        results[file_name] = f"⏹️ Đã dừng {file_name}"
+                        break
+                    if any(stop_flags.values()):
                         process.terminate()
                         results[file_name] = f"⏹️ Đã dừng {file_name}"
                         break
@@ -437,17 +453,13 @@ class TeleBot:
     def stop_spam(self, phone, user_id):
         stopped = []
         for key, process in list(running_processes.items()):
-            key_parts = key.split('_')
-            if len(key_parts) >= 3:
-                key_user_id = key_parts[0]
-                key_phone = key_parts[2]
-                if key_user_id == user_id and key_phone == phone:
-                    try:
-                        process.terminate()
-                        stopped.append(key)
-                        del running_processes[key]
-                    except:
-                        pass
+            if phone in key:
+                try:
+                    process.terminate()
+                    stopped.append(key)
+                    del running_processes[key]
+                except:
+                    pass
         if stopped:
             return True
         return False
@@ -486,18 +498,6 @@ class TeleBot:
         if str(user_id) in users:
             return users[str(user_id)].get('vip', False)
         return False
-
-    def delete_user_message(self, message):
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
-
-    def delete_user_message_after_delay(self, message, delay=0.1):
-        def _delete():
-            time.sleep(delay)
-            self.delete_user_message(message)
-        threading.Thread(target=_delete, daemon=True).start()
 
     def get_tiktok_profile(self, user_input):
         try:
@@ -775,8 +775,7 @@ class TeleBot:
                             bot.edit_message_text(format_message(msg), chat_id, last_msg_id, parse_mode='HTML')
                         else:
                             sent = bot.send_message(chat_id, format_message(msg), parse_mode='HTML')
-                            last_msg_id = sent.message_id
-                    except:
+                            last_msg_id = sent.message_id                    except:
                         sent = bot.send_message(chat_id, format_message(msg), parse_mode='HTML')
                         last_msg_id = sent.message_id
                 except Exception as e:
@@ -1453,6 +1452,8 @@ def handle_call(message):
     full_name = f"{full_name} {last_name}".strip()
     username = message.from_user.username or ""
     
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
@@ -1530,6 +1531,8 @@ def handle_callvip(message):
     last_name = message.from_user.last_name or ""
     full_name = f"{full_name} {last_name}".strip()
     username = message.from_user.username or ""
+    
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
@@ -1613,6 +1616,8 @@ def handle_stop(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
@@ -1665,6 +1670,8 @@ def handle_tx(message):
     chat_id = message.chat.id
     global tx_running, tx_thread
     
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
@@ -1713,6 +1720,8 @@ def handle_stoptx(message):
     chat_id = message.chat.id
     global tx_running
     
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
@@ -1741,6 +1750,9 @@ def handle_stoptx(message):
 @bot.message_handler(commands=['muavip'])
 def handle_muavip(message):
     chat_id = message.chat.id
+    
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     content = f"""📦 PACKAGE VIP
 
 😀 1 NGÀY: 20k
@@ -1764,6 +1776,8 @@ def handle_muavip(message):
 def handle_tiktok(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
+    
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
@@ -1841,6 +1855,8 @@ def handle_history(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
@@ -1871,6 +1887,8 @@ def handle_dudoan(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     global lc79_bot, bot_mode
+    
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
@@ -1913,6 +1931,8 @@ def handle_stopdudoan(message):
     chat_id = message.chat.id
     global lc79_bot, bot_mode
     
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
@@ -1950,6 +1970,8 @@ def handle_autocuoc(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     global lc79_bot, bot_mode
+    
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
@@ -2073,6 +2095,8 @@ def handle_stopautocuoc(message):
     chat_id = message.chat.id
     global lc79_bot, bot_mode
     
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id in banned_users:
         bot.reply_to(message, format_message("❌ Bạn đã bị ban khỏi bot!"), parse_mode='HTML')
         return
@@ -2121,6 +2145,8 @@ def handle_stopautocuoc(message):
 def handle_adduser(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
+    
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
@@ -2204,6 +2230,8 @@ def handle_listuser(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
         return
@@ -2245,6 +2273,8 @@ def handle_listuser(message):
 def handle_removeuser(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
+    
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
@@ -2313,6 +2343,8 @@ def handle_ban(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
         return
@@ -2352,6 +2384,8 @@ def handle_ban(message):
 def handle_unban(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
+    
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
@@ -2394,23 +2428,33 @@ def handle_stopall(message):
     chat_id = message.chat.id
     global tx_running
     
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
+    
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
         return
     
     tx_running = False
+    
+    stopped_count = 0
+    for key, process in list(running_processes.items()):
+        try:
+            process.terminate()
+            stopped_count += 1
+            del running_processes[key]
+        except:
+            pass
+    
+    for f in SPAM_FILES:
+        stop_flags[f] = True
+    
     success = bot_instance.stop_all_spam_admin()
     
-    if success:
-        content = f"""⏹️ ĐÃ DỪNG TẤT CẢ SPAM VÀ TX
+    content = f"""⏹️ ĐÃ DỪNG TẤT CẢ TIẾN TRÌNH
 
-└ ✅ Đã dừng tất cả tiến trình trên hệ thống
-
-📞 LIÊN HỆ: @Hahahhshah"""
-    else:
-        content = f"""⏹️ KHÔNG CÓ TIẾN TRÌNH NÀO
-
-└ ❌ Không có tiến trình nào đang chạy
+├ ✅ Đã dừng {stopped_count} tiến trình spam
+├ ✅ Đã dừng Tài Xỉu
+└ 📌 Tất cả tiến trình đã được dừng
 
 📞 LIÊN HỆ: @Hahahhshah"""
     bot.reply_to(message, format_message(content), parse_mode='HTML')
@@ -2420,6 +2464,8 @@ def handle_stopbot(message):
     user_id = str(message.from_user.id)
     chat_id = message.chat.id
     global bot_running, tx_running
+    
+    bot_instance.delete_user_message_after_delay(message, delay=0.1)
     
     if user_id != ADMIN_ID:
         bot.reply_to(message, format_message("❌ Bạn không có quyền sử dụng lệnh này!"), parse_mode='HTML')
