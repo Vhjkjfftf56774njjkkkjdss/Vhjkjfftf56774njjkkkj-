@@ -729,7 +729,7 @@ class TeleBot:
             if msg_id:
                 try:
                     bot.edit_message_text(format_message(msg), chat_id, msg_id, parse_mode='HTML')
-                except:
+                except Exception as e:
                     sent = bot.send_message(chat_id, format_message(msg), parse_mode='HTML')
                     msg_id = sent.message_id
             else:
@@ -775,7 +775,8 @@ class TeleBot:
                             bot.edit_message_text(format_message(msg), chat_id, last_msg_id, parse_mode='HTML')
                         else:
                             sent = bot.send_message(chat_id, format_message(msg), parse_mode='HTML')
-                            last_msg_id = sent.message_id                    except:
+                            last_msg_id = sent.message_id
+                    except Exception as e:
                         sent = bot.send_message(chat_id, format_message(msg), parse_mode='HTML')
                         last_msg_id = sent.message_id
                 except Exception as e:
