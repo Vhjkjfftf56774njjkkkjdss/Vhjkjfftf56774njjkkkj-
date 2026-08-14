@@ -110,11 +110,13 @@ jobs:
             $installPath = "C:\$verName"
             $installer = "python-$ver-installer.exe"
             
-            .\report-log.ps1 "📦 Đang tải Python $ver từ $url..."
+            $logMsg = "📦 Đang tải Python $ver từ $url"
+            .\report-log.ps1 $logMsg
             try {
               Invoke-WebRequest -Uri $url -OutFile $installer -ErrorAction Stop
               
-              .\report-log.ps1 "📦 Đang cài đặt Python $ver vào $installPath..."
+              $logMsg = "📦 Đang cài đặt Python $ver vào $installPath"
+              .\report-log.ps1 $logMsg
               Start-Process -FilePath ".\$installer" -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 TargetDir=$installPath" -Wait
               
               # Thêm vào PATH
@@ -123,10 +125,12 @@ jobs:
               
               Remove-Item $installer -Force -ErrorAction SilentlyContinue
               $pythonPaths[$ver] = $installPath
-              .\report-log.ps1 "✅ Đã cài đặt Python $ver thành công!"
+              $logMsg = "✅ Đã cài đặt Python $ver thành công!"
+              .\report-log.ps1 $logMsg
             } catch {
               $errorMsg = $_.Exception.Message
-              .\report-log.ps1 "⚠️ Không thể cài Python $ver - Lỗi: $errorMsg"
+              $logMsg = "⚠️ Không thể cài Python $ver - Lỗi: $errorMsg"
+              .\report-log.ps1 $logMsg
             }
           }
           
@@ -158,7 +162,8 @@ jobs:
             $pythonExe = "$pyPath\python.exe"
             $pipExe = "$pyPath\Scripts\pip.exe"
             
-            .\report-log.ps1 "📦 Đang cài thư viện cho Python $ver..."
+            $logMsg = "📦 Đang cài thư viện cho Python $ver..."
+            .\report-log.ps1 $logMsg
             
             # Kiểm tra Python
             if (Test-Path $pythonExe) {
@@ -177,18 +182,23 @@ jobs:
                     & $pipExe install $lib --quiet --no-warn-script-location --no-deps --timeout 60
                     $successCount++
                   } catch {
-                    .\report-log.ps1 "⚠️ Không thể cài $lib cho Python $ver"
+                    $logMsg = "⚠️ Không thể cài $lib cho Python $ver"
+                    .\report-log.ps1 $logMsg
                   }
                 }
               }
               
-              .\report-log.ps1 "✅ Đã cài $successCount/$($libraries.Count) thư viện cho Python $ver"
+              $logMsg = "✅ Đã cài $successCount/$($libraries.Count) thư viện cho Python $ver"
+              .\report-log.ps1 $logMsg
               
               # Hiển thị version
               $version = & $pythonExe --version 2>&1
-              .\report-log.ps1 "📌 Python $ver: $version"
+              $versionStr = $version.ToString()
+              $logMsg = "📌 Python $ver - Version: $versionStr"
+              .\report-log.ps1 $logMsg
             } else {
-              .\report-log.ps1 "⚠️ Không tìm thấy Python tại $pyPath"
+              $logMsg = "⚠️ Không tìm thấy Python tại $pyPath"
+              .\report-log.ps1 $logMsg
             }
           }
           
@@ -245,10 +255,12 @@ jobs:
             $outFile = "$file.py"
             try {
               Invoke-WebRequest -Uri $url -OutFile $outFile
-              .\report-log.ps1 "✅ Đã tải $outFile"
+              $logMsg = "✅ Đã tải $outFile"
+              .\report-log.ps1 $logMsg
             } catch {
               $errorMsg = $_.Exception.Message
-              .\report-log.ps1 "⚠️ Không thể tải $outFile - Lỗi: $errorMsg"
+              $logMsg = "⚠️ Không thể tải $outFile - Lỗi: $errorMsg"
+              .\report-log.ps1 $logMsg
             }
           }
           
@@ -273,7 +285,8 @@ jobs:
               $pyPath = $pythonPaths.$ver
               if (Test-Path "$pyPath\python.exe") {
                 $selectedPython = "$pyPath\python.exe"
-                .\report-log.ps1 "🔧 Sử dụng Python $ver: $selectedPython"
+                $logMsg = "🔧 Sử dụng Python $ver: $selectedPython"
+                .\report-log.ps1 $logMsg
                 break
               }
             }
@@ -298,7 +311,8 @@ jobs:
               Get-Content $webhookError -Tail 20 | ForEach-Object { .\report-log.ps1 "WEBHOOK ERROR: $_" }
             }
           } else {
-            .\report-log.ps1 "✅ webhook_remover.py đang chạy với PID: $($webhookProcess.Id)"
+            $logMsg = "✅ webhook_remover.py đang chạy với PID: $($webhookProcess.Id)"
+            .\report-log.ps1 $logMsg
           }
           
           .\report-log.ps1 "📱 Khởi chạy spam.py sau khi webhook đã chạy..."
@@ -315,7 +329,8 @@ jobs:
               Get-Content $errorLog -Tail 20 | ForEach-Object { .\report-log.ps1 "SPAM ERROR: $_" }
             }
           } else {
-            .\report-log.ps1 "✅ spam.py đang chạy với PID: $($spamProcess.Id)"
+            $logMsg = "✅ spam.py đang chạy với PID: $($spamProcess.Id)"
+            .\report-log.ps1 $logMsg
             if (Test-Path $logFile) {
               Get-Content $logFile -Tail 5 | ForEach-Object { .\report-log.ps1 "SPAM OUTPUT: $_" }
             }
@@ -348,7 +363,8 @@ jobs:
               try {
                 if (Test-Path $filePath) {
                   Remove-Item $filePath -Force -ErrorAction Stop
-                  .\report-log.ps1 "✅ Đã xóa file cũ: $filePath"
+                  $logMsg = "✅ Đã xóa file cũ: $filePath"
+                  .\report-log.ps1 $logMsg
                 }
                 return $true
               } catch {
@@ -373,7 +389,8 @@ jobs:
 
                   if ($fullAddress -ne $lastFullAddress) {
                     $lastFullAddress = $fullAddress
-                    .\report-log.ps1 "✅ Mở port RDP thành công trên Bore: $fullAddress"
+                    $logMsg = "✅ Mở port RDP thành công trên Bore: $fullAddress"
+                    .\report-log.ps1 $logMsg
                     
                     $createdAt = (Get-Date).ToString('HH:mm:ss dd/MM/yyyy')
                     $reportLines = @(
@@ -411,7 +428,8 @@ jobs:
                     git commit -m "Update RDP: $portOnly [skip ci]"
                     git push origin main --force
                     
-                    .\report-log.ps1 "✅ Đã commit thông tin RDP lên repo: $fullAddress"
+                    $logMsg = "✅ Đã commit thông tin RDP lên repo: $fullAddress"
+                    .\report-log.ps1 $logMsg
                   }
                 }
               }
@@ -443,14 +461,16 @@ jobs:
               .\report-log.ps1 "⚠️ spam.py đã chết! Đang khởi động lại..."
               $spamProcess = Start-Process -FilePath $selectedPython -ArgumentList "-X utf8 spam.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $logFile -RedirectStandardError $errorLog
               Start-Sleep -Seconds 2
-              .\report-log.ps1 "✅ Đã restart spam.py với PID: $($spamProcess.Id)"
+              $logMsg = "✅ Đã restart spam.py với PID: $($spamProcess.Id)"
+              .\report-log.ps1 $logMsg
             }
             
             if ($webhookProcess.HasExited) {
               .\report-log.ps1 "⚠️ webhook_remover.py đã chết! Đang khởi động lại..."
               $webhookProcess = Start-Process -FilePath $selectedPython -ArgumentList "-X utf8 webhook_remover.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $webhookLog -RedirectStandardError $webhookError
               Start-Sleep -Seconds 2
-              .\report-log.ps1 "✅ Đã restart webhook_remover.py với PID: $($webhookProcess.Id)"
+              $logMsg = "✅ Đã restart webhook_remover.py với PID: $($webhookProcess.Id)"
+              .\report-log.ps1 $logMsg
             }
             
             Start-Sleep -Milliseconds 500
