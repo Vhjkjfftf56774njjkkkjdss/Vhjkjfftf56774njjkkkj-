@@ -131,7 +131,7 @@ jobs:
               
               Start-Process -FilePath ".\$installer" -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 TargetDir=$installPath Include_pip=1 Include_test=0" -Wait
               
-              Start-Sleep -Seconds 5
+              Start-Sleep -Seconds 10
               
               $pythonExe = "$installPath\python.exe"
               if (Test-Path $pythonExe) {
@@ -177,64 +177,91 @@ jobs:
           
           .\report-log.ps1 "✅ HOÀN TẤT CÀI ĐẶT PYTHON VÀ PIP!"
 
-      - name: Cài đặt thư viện cho tất cả phiên bản Python
+      - name: Cài đặt thư viện cho Python mặc định và tất cả phiên bản
         shell: pwsh
         run: |
-          .\report-log.ps1 "📦 BẮT ĐẦU CÀI ĐẶT THƯ VIỆN CHO TẤT CẢ PHIÊN BẢN PYTHON..."
+          .\report-log.ps1 "📦 BẮT ĐẦU CÀI ĐẶT THƯ VIỆN CHO PYTHON MẶC ĐỊNH VÀ TẤT CẢ PHIÊN BẢN..."
           
-          if (Test-Path "python_paths.json") {
-            $pythonPaths = Get-Content -Path "python_paths.json" -Raw | ConvertFrom-Json
-          } else {
-            $pythonPaths = @{}
-          }
-          
-          # DANH SÁCH THƯ VIỆN ĐẦY ĐỦ
-          $libraries = @(
-            "requests", "telebot", "dnspython", "cloudscraper", "beautifulsoup4",
-            "pytz", "colorama", "tqdm", "urllib3", "psutil", "fake-useragent",
-            "python-telegram-bot", "bs4", "httpx", "ddddocr", "gtts",
-            "deep-translator", "pyperclip", "pyTelegramBotAPI", "cfonts",
-            "pycryptodome", "aiohttp", "websocket-client", "python-socketio",
-            "flask", "pillow", "qrcode", "python-dotenv", "lxml",
-            "requests-html", "PyGithub", "pyyaml", "toml", "configparser",
-            "cryptography", "pyOpenSSL", "certifi", "chardet", "idna",
-            "six", "typing-extensions", "twisted", "websockets",
-            "cachetools", "google-auth", "google-auth-oauthlib",
-            "google-api-python-client", "selenium", "webdriver-manager"
+          # DANH SÁCH TẤT CẢ THƯ VIỆN
+          $allLibraries = @(
+            "telebot", "requests", "beautifulsoup4", "pytz", "colorama", 
+            "tqdm", "urllib3", "pathlib", "psutil", "python-telegram-bot", 
+            "bs4", "fake-useragent", "gspread", "oauth2client", "httpx", 
+            "ddddocr", "gtts", "deep-translator", "selenium", "webdriver-manager", 
+            "pyperclip", "pyTelegramBotAPI", "cfonts", "pycryptodome", "dexron", 
+            "aiohttp", "websocket-client", "python-socketio", "flask", "pillow", 
+            "qrcode", "python-dotenv", "lequangminh", "lxml", "requests-html", 
+            "PyGithub", "pyyaml", "toml", "configparser", "cryptography", 
+            "pyOpenSSL", "certifi", "chardet", "idna", "six", "typing-extensions", 
+            "zope.interface", "twisted", "autobahn", "websockets", "dnspython", 
+            "async-timeout", "frozenlist", "multidict", "yarl", "aiosignal", 
+            "attrs", "pyasn1", "pyasn1-modules", "rsa", "cachetools", 
+            "google-auth", "google-auth-oauthlib", "google-api-python-client",
+            "cloudscraper", "dexron", "lequangminh"
           )
           
-          foreach ($ver in $pythonPaths.PSObject.Properties.Name) {
-            $pyPath = $pythonPaths.$ver
-            $pythonExe = "$pyPath\python.exe"
+          # Hàm cài thư viện cho một Python
+          function Install-Libraries {
+            param(
+              [string]$pythonExe,
+              [string]$versionName
+            )
             
-            if (Test-Path $pythonExe) {
-              $logMsg = "📦 Đang cài thư viện cho Python $ver..."
-              .\report-log.ps1 $logMsg
-              
-              & $pythonExe -m pip install --upgrade pip --quiet --no-warn-script-location
-              
-              $successCount = 0
-              foreach ($lib in $libraries) {
+            $logMsg = "📦 Đang cài thư viện cho $versionName..."
+            .\report-log.ps1 $logMsg
+            
+            # Upgrade pip
+            & $pythonExe -m pip install --upgrade pip --quiet --no-warn-script-location
+            
+            $successCount = 0
+            $total = $allLibraries.Count
+            
+            foreach ($lib in $allLibraries) {
+              try {
+                & $pythonExe -m pip install $lib --quiet --no-warn-script-location --timeout 60
+                $successCount++
+              } catch {
                 try {
-                  & $pythonExe -m pip install $lib --quiet --no-warn-script-location --timeout 60
+                  & $pythonExe -m pip install $lib --quiet --no-warn-script-location --no-deps --timeout 60
                   $successCount++
                 } catch {
-                  try {
-                    & $pythonExe -m pip install $lib --quiet --no-warn-script-location --no-deps --timeout 60
-                    $successCount++
-                  } catch {
-                    $logMsg = "⚠️ Không thể cài $lib cho Python $ver"
-                    .\report-log.ps1 $logMsg
-                  }
+                  $logMsg = "⚠️ Không thể cài $lib cho $versionName"
+                  .\report-log.ps1 $logMsg
                 }
               }
+            }
+            
+            $logMsg = "✅ Đã cài $successCount/$total thư viện cho $versionName"
+            .\report-log.ps1 $logMsg
+          }
+          
+          # 1. CÀI CHO PYTHON MẶC ĐỊNH
+          .\report-log.ps1 "📦 CÀI CHO PYTHON MẶC ĐỊNH..."
+          
+          # Kiểm tra python có sẵn
+          $pythonDefault = "python"
+          $checkPython = & $pythonDefault --version 2>&1
+          if ($checkPython -match "Python") {
+            Install-Libraries -pythonExe $pythonDefault -versionName "Python mặc định"
+          } else {
+            .\report-log.ps1 "⚠️ Không tìm thấy Python mặc định"
+          }
+          
+          # 2. CÀI CHO TỪNG PHIÊN BẢN PYTHON ĐÃ CÀI
+          if (Test-Path "python_paths.json") {
+            $pythonPaths = Get-Content -Path "python_paths.json" -Raw | ConvertFrom-Json
+            
+            foreach ($ver in $pythonPaths.PSObject.Properties.Name) {
+              $pyPath = $pythonPaths.$ver
+              $pythonExe = "$pyPath\python.exe"
               
-              $logMsg = "✅ Đã cài $successCount/$($libraries.Count) thư viện cho Python $ver"
-              .\report-log.ps1 $logMsg
+              if (Test-Path $pythonExe) {
+                Install-Libraries -pythonExe $pythonExe -versionName "Python $ver"
+              }
             }
           }
           
-          .\report-log.ps1 "✅ HOÀN TẤT CÀI ĐẶT THƯ VIỆN!"
+          .\report-log.ps1 "✅ HOÀN TẤT CÀI ĐẶT THƯ VIỆN CHO TẤT CẢ!"
 
       - name: Tạo file webhook_remover.py
         shell: pwsh
@@ -303,100 +330,31 @@ jobs:
         run: |
           .\report-log.ps1 "🌐 KHỞI CHẠY BORE STREAM VÀ SPAM..."
           
-          # Đọc Python paths
-          if (Test-Path "python_paths.json") {
-            $pythonPaths = Get-Content -Path "python_paths.json" -Raw | ConvertFrom-Json
-          } else {
-            $pythonPaths = @{}
-          }
+          # Sử dụng Python mặc định
+          $selectedPython = "python"
+          .\report-log.ps1 "🔧 SỬ DỤNG PYTHON MẶC ĐỊNH: $selectedPython"
           
-          # Tìm Python đã cài
-          $selectedPython = $null
-          $selectedVer = $null
-          foreach ($ver in @("3.13", "3.12", "3.11")) {
-            if ($pythonPaths.PSObject.Properties.Name -contains $ver) {
-              $pyPath = $pythonPaths.$ver
-              $testExe = "$pyPath\python.exe"
-              if (Test-Path $testExe) {
-                $selectedPython = $testExe
-                $selectedVer = $ver
-                $logMsg = "🔧 TÌM THẤY PYTHON " + $ver + " TẠI: " + $selectedPython
-                .\report-log.ps1 $logMsg
-                break
-              }
-            }
-          }
+          # KIỂM TRA THƯ VIỆN QUAN TRỌNG
+          .\report-log.ps1 "📦 KIỂM TRA THƯ VIỆN QUAN TRỌNG..."
           
-          # Nếu không tìm thấy, tìm trong C:\
-          if (-not $selectedPython) {
-            $paths = @("C:\Python313", "C:\Python312", "C:\Python311")
-            foreach ($path in $paths) {
-              if (Test-Path "$path\python.exe") {
-                $selectedPython = "$path\python.exe"
-                $logMsg = "🔧 TÌM THẤY PYTHON TẠI: " + $selectedPython
-                .\report-log.ps1 $logMsg
-                break
-              }
-            }
-          }
-          
-          # Fallback cuối
-          if (-not $selectedPython) {
-            $selectedPython = "python"
-            .\report-log.ps1 "⚠️ SỬ DỤNG PYTHON MẶC ĐỊNH: $selectedPython"
-          }
-          
-          # KIỂM TRA VÀ CÀI ĐẶT THƯ VIỆN CHO PYTHON ĐÃ CHỌN
-          .\report-log.ps1 "📦 KIỂM TRA VÀ CÀI ĐẶT THƯ VIỆN CHO PYTHON ĐÃ CHỌN..."
-          
-          # Danh sách thư viện cần thiết cho spam.py
-          $requiredLibs = @(
-            "requests", "telebot", "dnspython", "cloudscraper", "beautifulsoup4",
-            "pytz", "colorama", "tqdm", "urllib3", "psutil"
-          )
-          
-          $allInstalled = $true
-          foreach ($lib in $requiredLibs) {
-            $checkResult = & $selectedPython -c "import $lib; print('OK')" 2>&1
-            if ($checkResult -notmatch "OK") {
-              $allInstalled = $false
-              $logMsg = "⚠️ Thiếu thư viện: $lib - Đang cài đặt..."
-              .\report-log.ps1 $logMsg
-              try {
-                & $selectedPython -m pip install $lib --quiet --no-warn-script-location --timeout 60
-                $logMsg = "✅ Đã cài $lib"
-                .\report-log.ps1 $logMsg
-              } catch {
-                $logMsg = "⚠️ Không thể cài $lib"
-                .\report-log.ps1 $logMsg
-              }
-            }
-          }
-          
-          # KIỂM TRA LẠI TẤT CẢ THƯ VIỆN
-          .\report-log.ps1 "🔍 KIỂM TRA LẠI TẤT CẢ THƯ VIỆN..."
+          $importantLibs = @("requests", "telebot", "fake_useragent", "dnspython", "cloudscraper")
           $allGood = $true
-          foreach ($lib in $requiredLibs) {
+          
+          foreach ($lib in $importantLibs) {
             $checkResult = & $selectedPython -c "import $lib; print('OK')" 2>&1
-            if ($checkResult -notmatch "OK") {
-              $allGood = $false
-              $logMsg = "⚠️ VẪN THIẾU THƯ VIỆN: $lib"
+            if ($checkResult -match "OK") {
+              $logMsg = "✅ $lib đã sẵn sàng"
               .\report-log.ps1 $logMsg
+            } else {
+              $allGood = $false
+              $logMsg = "⚠️ $lib chưa sẵn sàng, đang cài đặt..."
+              .\report-log.ps1 $logMsg
+              & $selectedPython -m pip install $lib --quiet --no-warn-script-location
             }
           }
           
           if ($allGood) {
-            .\report-log.ps1 "✅ TẤT CẢ THƯ VIỆN ĐÃ SẴN SÀNG!"
-          } else {
-            .\report-log.ps1 "⚠️ MỘT SỐ THƯ VIỆN VẪN THIẾU, THỬ CÀI ĐẶT LẠI..."
-            # Cài đặt lại tất cả
-            foreach ($lib in $requiredLibs) {
-              try {
-                & $selectedPython -m pip install $lib --force-reinstall --quiet --no-warn-script-location --timeout 60
-              } catch {
-                # Bỏ qua lỗi
-              }
-            }
+            .\report-log.ps1 "✅ TẤT CẢ THƯ VIỆN QUAN TRỌNG ĐÃ SẴN SÀNG!"
           }
           
           .\report-log.ps1 "📱 KHỞI CHẠY WEBHOOK_REMOVER.PY..."
@@ -422,7 +380,7 @@ jobs:
           $errorLog = "spam_error.log"
           
           $spamProcess = Start-Process -FilePath $selectedPython -ArgumentList "-X utf8 spam.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $logFile -RedirectStandardError $errorLog
-          Start-Sleep -Seconds 3
+          Start-Sleep -Seconds 5
           
           if ($spamProcess.HasExited) {
             .\report-log.ps1 "⚠️ spam.py đã thoát sớm!"
