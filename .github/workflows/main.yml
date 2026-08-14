@@ -285,7 +285,7 @@ jobs:
               $pyPath = $pythonPaths.$ver
               if (Test-Path "$pyPath\python.exe") {
                 $selectedPython = "$pyPath\python.exe"
-                $logMsg = "🔧 Sử dụng Python $ver: $selectedPython"
+                $logMsg = "🔧 Sử dụng Python " + $ver + " - Path: " + $selectedPython
                 .\report-log.ps1 $logMsg
                 break
               }
