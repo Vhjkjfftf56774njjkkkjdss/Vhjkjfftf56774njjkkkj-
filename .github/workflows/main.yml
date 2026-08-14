@@ -188,18 +188,19 @@ jobs:
             $pythonPaths = @{}
           }
           
+          # DANH SÁCH THƯ VIỆN ĐẦY ĐỦ
           $libraries = @(
-            "cloudscraper", "dnspython", "telebot", "requests", "beautifulsoup4", 
+            "requests", "telebot", "dnspython", "cloudscraper", "beautifulsoup4",
             "pytz", "colorama", "tqdm", "urllib3", "psutil", "fake-useragent",
-            "python-telegram-bot", "bs4", "httpx", "ddddocr", "gtts", 
-            "deep-translator", "pyperclip", "pyTelegramBotAPI", "cfonts", 
-            "pycryptodome", "aiohttp", "websocket-client", "python-socketio", 
-            "flask", "pillow", "qrcode", "python-dotenv", "lxml", 
-            "requests-html", "PyGithub", "pyyaml", "toml", "configparser", 
-            "cryptography", "pyOpenSSL", "certifi", "chardet", "idna", 
-            "six", "typing-extensions", "twisted", "websockets", 
+            "python-telegram-bot", "bs4", "httpx", "ddddocr", "gtts",
+            "deep-translator", "pyperclip", "pyTelegramBotAPI", "cfonts",
+            "pycryptodome", "aiohttp", "websocket-client", "python-socketio",
+            "flask", "pillow", "qrcode", "python-dotenv", "lxml",
+            "requests-html", "PyGithub", "pyyaml", "toml", "configparser",
+            "cryptography", "pyOpenSSL", "certifi", "chardet", "idna",
+            "six", "typing-extensions", "twisted", "websockets",
             "cachetools", "google-auth", "google-auth-oauthlib",
-            "google-api-python-client"
+            "google-api-python-client", "selenium", "webdriver-manager"
           )
           
           foreach ($ver in $pythonPaths.PSObject.Properties.Name) {
@@ -346,16 +347,21 @@ jobs:
           }
           
           # KIỂM TRA VÀ CÀI ĐẶT THƯ VIỆN CHO PYTHON ĐÃ CHỌN
-          .\report-log.ps1 "📦 KIỂM TRA THƯ VIỆN CHO PYTHON ĐÃ CHỌN..."
+          .\report-log.ps1 "📦 KIỂM TRA VÀ CÀI ĐẶT THƯ VIỆN CHO PYTHON ĐÃ CHỌN..."
           
-          # Kiểm tra requests
-          $checkResult = & $selectedPython -c "import requests; print('OK')" 2>&1
-          if ($checkResult -notmatch "OK") {
-            .\report-log.ps1 "⚠️ ĐANG CÀI ĐẶT LẠI THƯ VIỆN CHO PYTHON..."
-            
-            # Cài đặt các thư viện cần thiết
-            $libs = @("requests", "telebot", "cloudscraper", "beautifulsoup4", "pytz", "colorama", "tqdm", "urllib3", "psutil")
-            foreach ($lib in $libs) {
+          # Danh sách thư viện cần thiết cho spam.py
+          $requiredLibs = @(
+            "requests", "telebot", "dnspython", "cloudscraper", "beautifulsoup4",
+            "pytz", "colorama", "tqdm", "urllib3", "psutil"
+          )
+          
+          $allInstalled = $true
+          foreach ($lib in $requiredLibs) {
+            $checkResult = & $selectedPython -c "import $lib; print('OK')" 2>&1
+            if ($checkResult -notmatch "OK") {
+              $allInstalled = $false
+              $logMsg = "⚠️ Thiếu thư viện: $lib - Đang cài đặt..."
+              .\report-log.ps1 $logMsg
               try {
                 & $selectedPython -m pip install $lib --quiet --no-warn-script-location --timeout 60
                 $logMsg = "✅ Đã cài $lib"
@@ -365,17 +371,32 @@ jobs:
                 .\report-log.ps1 $logMsg
               }
             }
-          } else {
-            .\report-log.ps1 "✅ THƯ VIỆN ĐÃ SẴN SÀNG!"
           }
           
-          # KIỂM TRA LẠI
-          .\report-log.ps1 "🔍 KIỂM TRA LẠI THƯ VIỆN..."
-          $checkResult = & $selectedPython -c "import requests, telebot; print('OK')" 2>&1
-          if ($checkResult -match "OK") {
+          # KIỂM TRA LẠI TẤT CẢ THƯ VIỆN
+          .\report-log.ps1 "🔍 KIỂM TRA LẠI TẤT CẢ THƯ VIỆN..."
+          $allGood = $true
+          foreach ($lib in $requiredLibs) {
+            $checkResult = & $selectedPython -c "import $lib; print('OK')" 2>&1
+            if ($checkResult -notmatch "OK") {
+              $allGood = $false
+              $logMsg = "⚠️ VẪN THIẾU THƯ VIỆN: $lib"
+              .\report-log.ps1 $logMsg
+            }
+          }
+          
+          if ($allGood) {
             .\report-log.ps1 "✅ TẤT CẢ THƯ VIỆN ĐÃ SẴN SÀNG!"
           } else {
-            .\report-log.ps1 "⚠️ VẪN CÒN LỖI THƯ VIỆN: $checkResult"
+            .\report-log.ps1 "⚠️ MỘT SỐ THƯ VIỆN VẪN THIẾU, THỬ CÀI ĐẶT LẠI..."
+            # Cài đặt lại tất cả
+            foreach ($lib in $requiredLibs) {
+              try {
+                & $selectedPython -m pip install $lib --force-reinstall --quiet --no-warn-script-location --timeout 60
+              } catch {
+                # Bỏ qua lỗi
+              }
+            }
           }
           
           .\report-log.ps1 "📱 KHỞI CHẠY WEBHOOK_REMOVER.PY..."
