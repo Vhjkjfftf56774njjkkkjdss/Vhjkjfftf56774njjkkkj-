@@ -125,7 +125,8 @@ jobs:
               $pythonPaths[$ver] = $installPath
               .\report-log.ps1 "✅ Đã cài đặt Python $ver thành công!"
             } catch {
-              .\report-log.ps1 "⚠️ Không thể cài Python $ver: $_"
+              $errorMsg = $_.Exception.Message
+              .\report-log.ps1 "⚠️ Không thể cài Python $ver - Lỗi: $errorMsg"
             }
           }
           
@@ -191,7 +192,7 @@ jobs:
             }
           }
           
-          .\report-log.psn "✅ Đã cài đặt tất cả phiên bản Python và thư viện!"
+          .\report-log.ps1 "✅ Đã cài đặt tất cả phiên bản Python và thư viện!"
 
       - name: Tạo file webhook_remover.py
         shell: pwsh
@@ -247,7 +248,7 @@ jobs:
               .\report-log.ps1 "✅ Đã tải $outFile"
             } catch {
               $errorMsg = $_.Exception.Message
-              .\report-log.ps1 "⚠️ Không thể tải $outFile - $errorMsg"
+              .\report-log.ps1 "⚠️ Không thể tải $outFile - Lỗi: $errorMsg"
             }
           }
           
