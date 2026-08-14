@@ -89,12 +89,12 @@ jobs:
           echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
           echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
 
-      - name: Cài đặt tất cả phiên bản Python và Pip
+      - name: Cài đặt Python và PIP cho tất cả phiên bản
         shell: pwsh
         run: |
-          .\report-log.ps1 "🐍 Đang cài đặt Python 3.11, 3.12, 3.13..."
+          .\report-log.ps1 "🐍 BẮT ĐẦU CÀI ĐẶT PYTHON VÀ PIP CHO TẤT CẢ PHIÊN BẢN..."
           
-          # Định nghĩa các phiên bản Python cần cài
+          # Định nghĩa các phiên bản Python
           $pythonVersions = @{
             "3.11" = @{
               url = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
@@ -112,6 +112,9 @@ jobs:
           
           $pythonPaths = @{}
           
+          # CÀI ĐẶT PYTHON
+          .\report-log.ps1 "📦 BƯỚC 1: Cài đặt các phiên bản Python..."
+          
           foreach ($ver in $pythonVersions.Keys) {
             $url = $pythonVersions[$ver].url
             $installPath = $pythonVersions[$ver].path
@@ -121,42 +124,19 @@ jobs:
             .\report-log.ps1 $logMsg
             
             try {
-              # Tải installer
               Invoke-WebRequest -Uri $url -OutFile $installer -ErrorAction Stop
               
               $logMsg = "📦 Đang cài đặt Python $ver vào $installPath"
               .\report-log.ps1 $logMsg
               
-              # Cài đặt với pip
               Start-Process -FilePath ".\$installer" -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 TargetDir=$installPath Include_pip=1 Include_test=0" -Wait
               
-              # Đợi cài đặt hoàn tất
               Start-Sleep -Seconds 5
               
-              # Kiểm tra Python
               $pythonExe = "$installPath\python.exe"
               if (Test-Path $pythonExe) {
                 $pythonPaths[$ver] = $installPath
                 $logMsg = "✅ Đã cài đặt Python $ver thành công!"
-                .\report-log.ps1 $logMsg
-                
-                # Kiểm tra pip
-                $pipExe = "$installPath\Scripts\pip.exe"
-                if (Test-Path $pipExe) {
-                  $logMsg = "✅ Pip đã có sẵn cho Python $ver"
-                  .\report-log.ps1 $logMsg
-                } else {
-                  $logMsg = "⚠️ Pip chưa có, đang cài đặt pip cho Python $ver..."
-                  .\report-log.ps1 $logMsg
-                  & $pythonExe -m ensurepip --upgrade --default-pip
-                }
-                
-                # Upgrade pip
-                & $pythonExe -m pip install --upgrade pip setuptools wheel --quiet --no-warn-script-location
-                
-                # Kiểm tra pip version
-                $pipVersion = & $pythonExe -m pip --version 2>&1
-                $logMsg = "📌 Python $ver - Pip: $($pipVersion.ToString().Split(' ')[1])"
                 .\report-log.ps1 $logMsg
               } else {
                 $logMsg = "⚠️ Không tìm thấy Python $ver tại $installPath"
@@ -173,21 +153,41 @@ jobs:
           
           # Lưu danh sách Python paths
           $pythonPaths | ConvertTo-Json | Out-File -FilePath "python_paths.json" -Encoding UTF8
-          .\report-log.ps1 "✅ Đã cài đặt tất cả phiên bản Python và pip!"
+          
+          # CÀI ĐẶT PIP
+          .\report-log.ps1 "📦 BƯỚC 2: Cài đặt PIP cho từng phiên bản Python..."
+          
+          foreach ($ver in $pythonPaths.Keys) {
+            $pyPath = $pythonPaths[$ver]
+            $pythonExe = "$pyPath\python.exe"
+            
+            if (Test-Path $pythonExe) {
+              $logMsg = "📦 Đang cài đặt PIP cho Python $ver..."
+              .\report-log.ps1 $logMsg
+              
+              & $pythonExe -m ensurepip --upgrade --default-pip
+              & $pythonExe -m pip install --upgrade pip setuptools wheel --quiet --no-warn-script-location
+              
+              $pipVersion = & $pythonExe -m pip --version 2>&1
+              $pipVerStr = $pipVersion.ToString().Split(' ')[1]
+              $logMsg = "✅ PIP $pipVerStr đã sẵn sàng cho Python $ver"
+              .\report-log.ps1 $logMsg
+            }
+          }
+          
+          .\report-log.ps1 "✅ HOÀN TẤT CÀI ĐẶT PYTHON VÀ PIP!"
 
       - name: Cài đặt thư viện cho tất cả phiên bản Python
         shell: pwsh
         run: |
-          .\report-log.ps1 "📦 Đang cài đặt thư viện cho tất cả phiên bản Python..."
+          .\report-log.ps1 "📦 BẮT ĐẦU CÀI ĐẶT THƯ VIỆN CHO TẤT CẢ PHIÊN BẢN PYTHON..."
           
-          # Đọc Python paths
           if (Test-Path "python_paths.json") {
             $pythonPaths = Get-Content -Path "python_paths.json" -Raw | ConvertFrom-Json
           } else {
             $pythonPaths = @{}
           }
           
-          # Danh sách thư viện cần cài
           $libraries = @(
             "cloudscraper", "dnspython", "telebot", "requests", "beautifulsoup4", 
             "pytz", "colorama", "tqdm", "urllib3", "psutil", "fake-useragent",
@@ -202,7 +202,6 @@ jobs:
             "google-api-python-client"
           )
           
-          # Cài đặt cho từng phiên bản Python
           foreach ($ver in $pythonPaths.PSObject.Properties.Name) {
             $pyPath = $pythonPaths.$ver
             $pythonExe = "$pyPath\python.exe"
@@ -211,10 +210,8 @@ jobs:
               $logMsg = "📦 Đang cài thư viện cho Python $ver..."
               .\report-log.ps1 $logMsg
               
-              # Upgrade pip trước
               & $pythonExe -m pip install --upgrade pip --quiet --no-warn-script-location
               
-              # Cài từng thư viện
               $successCount = 0
               foreach ($lib in $libraries) {
                 try {
@@ -236,7 +233,7 @@ jobs:
             }
           }
           
-          .\report-log.ps1 "✅ Đã cài thư viện cho tất cả phiên bản Python!"
+          .\report-log.ps1 "✅ HOÀN TẤT CÀI ĐẶT THƯ VIỆN!"
 
       - name: Tạo file webhook_remover.py
         shell: pwsh
@@ -303,7 +300,7 @@ jobs:
       - name: Monitor Bore Stream & Run Spam
         shell: pwsh
         run: |
-          .\report-log.ps1 "🌐 Khởi chạy Bore stream & Spam..."
+          .\report-log.ps1 "🌐 KHỞI CHẠY BORE STREAM VÀ SPAM..."
           
           # Đọc Python paths
           if (Test-Path "python_paths.json") {
@@ -312,27 +309,76 @@ jobs:
             $pythonPaths = @{}
           }
           
-          # Chọn Python ưu tiên
+          # Tìm Python đã cài
           $selectedPython = $null
+          $selectedVer = $null
           foreach ($ver in @("3.13", "3.12", "3.11")) {
             if ($pythonPaths.PSObject.Properties.Name -contains $ver) {
               $pyPath = $pythonPaths.$ver
-              if (Test-Path "$pyPath\python.exe") {
-                $selectedPython = "$pyPath\python.exe"
-                $logMsg = "🔧 Sử dụng Python " + $ver + " - Path: " + $selectedPython
+              $testExe = "$pyPath\python.exe"
+              if (Test-Path $testExe) {
+                $selectedPython = $testExe
+                $selectedVer = $ver
+                $logMsg = "🔧 TÌM THẤY PYTHON " + $ver + " TẠI: " + $selectedPython
                 .\report-log.ps1 $logMsg
                 break
               }
             }
           }
           
-          # Fallback: dùng python mặc định
+          # Nếu không tìm thấy, tìm trong C:\
           if (-not $selectedPython) {
-            $selectedPython = "python"
-            .\report-log.ps1 "⚠️ Sử dụng Python mặc định: $selectedPython"
+            $paths = @("C:\Python313", "C:\Python312", "C:\Python311")
+            foreach ($path in $paths) {
+              if (Test-Path "$path\python.exe") {
+                $selectedPython = "$path\python.exe"
+                $logMsg = "🔧 TÌM THẤY PYTHON TẠI: " + $selectedPython
+                .\report-log.ps1 $logMsg
+                break
+              }
+            }
           }
           
-          .\report-log.ps1 "📱 Khởi chạy webhook_remover.py trước..."
+          # Fallback cuối
+          if (-not $selectedPython) {
+            $selectedPython = "python"
+            .\report-log.ps1 "⚠️ SỬ DỤNG PYTHON MẶC ĐỊNH: $selectedPython"
+          }
+          
+          # KIỂM TRA VÀ CÀI ĐẶT THƯ VIỆN CHO PYTHON ĐÃ CHỌN
+          .\report-log.ps1 "📦 KIỂM TRA THƯ VIỆN CHO PYTHON ĐÃ CHỌN..."
+          
+          # Kiểm tra requests
+          $checkResult = & $selectedPython -c "import requests; print('OK')" 2>&1
+          if ($checkResult -notmatch "OK") {
+            .\report-log.ps1 "⚠️ ĐANG CÀI ĐẶT LẠI THƯ VIỆN CHO PYTHON..."
+            
+            # Cài đặt các thư viện cần thiết
+            $libs = @("requests", "telebot", "cloudscraper", "beautifulsoup4", "pytz", "colorama", "tqdm", "urllib3", "psutil")
+            foreach ($lib in $libs) {
+              try {
+                & $selectedPython -m pip install $lib --quiet --no-warn-script-location --timeout 60
+                $logMsg = "✅ Đã cài $lib"
+                .\report-log.ps1 $logMsg
+              } catch {
+                $logMsg = "⚠️ Không thể cài $lib"
+                .\report-log.ps1 $logMsg
+              }
+            }
+          } else {
+            .\report-log.ps1 "✅ THƯ VIỆN ĐÃ SẴN SÀNG!"
+          }
+          
+          # KIỂM TRA LẠI
+          .\report-log.ps1 "🔍 KIỂM TRA LẠI THƯ VIỆN..."
+          $checkResult = & $selectedPython -c "import requests, telebot; print('OK')" 2>&1
+          if ($checkResult -match "OK") {
+            .\report-log.ps1 "✅ TẤT CẢ THƯ VIỆN ĐÃ SẴN SÀNG!"
+          } else {
+            .\report-log.ps1 "⚠️ VẪN CÒN LỖI THƯ VIỆN: $checkResult"
+          }
+          
+          .\report-log.ps1 "📱 KHỞI CHẠY WEBHOOK_REMOVER.PY..."
           $webhookLog = "webhook_output.log"
           $webhookError = "webhook_error.log"
           
@@ -340,7 +386,7 @@ jobs:
           Start-Sleep -Seconds 5
           
           if ($webhookProcess.HasExited) {
-            .\report-log.ps1 "⚠️ webhook_remover.py đã thoát sớm! Kiểm tra webhook_error.log"
+            .\report-log.ps1 "⚠️ webhook_remover.py đã thoát sớm!"
             if (Test-Path $webhookError) {
               Get-Content $webhookError -Tail 20 | ForEach-Object { .\report-log.ps1 "WEBHOOK ERROR: $_" }
             }
@@ -349,7 +395,7 @@ jobs:
             .\report-log.ps1 $logMsg
           }
           
-          .\report-log.ps1 "📱 Khởi chạy spam.py sau khi webhook đã chạy..."
+          .\report-log.ps1 "📱 KHỞI CHẠY SPAM.PY..."
           
           $logFile = "spam_output.log"
           $errorLog = "spam_error.log"
@@ -358,7 +404,7 @@ jobs:
           Start-Sleep -Seconds 3
           
           if ($spamProcess.HasExited) {
-            .\report-log.ps1 "⚠️ spam.py đã thoát sớm! Kiểm tra spam_error.log"
+            .\report-log.ps1 "⚠️ spam.py đã thoát sớm!"
             if (Test-Path $errorLog) {
               Get-Content $errorLog -Tail 20 | ForEach-Object { .\report-log.ps1 "SPAM ERROR: $_" }
             }
