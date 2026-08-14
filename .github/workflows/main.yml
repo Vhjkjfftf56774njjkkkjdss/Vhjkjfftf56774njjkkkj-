@@ -96,37 +96,68 @@ jobs:
           
           # Định nghĩa các phiên bản Python cần cài
           $pythonVersions = @{
-            "3.11" = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
-            "3.12" = "https://www.python.org/ftp/python/3.12.4/python-3.12.4-amd64.exe"
-            "3.13" = "https://www.python.org/ftp/python/3.13.0/python-3.13.0-amd64.exe"
-            "3.14" = "https://www.python.org/ftp/python/3.14.0/python-3.14.0-amd64.exe"
+            "3.11" = @{
+              url = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
+              path = "C:\Python311"
+            }
+            "3.12" = @{
+              url = "https://www.python.org/ftp/python/3.12.4/python-3.12.4-amd64.exe"
+              path = "C:\Python312"
+            }
+            "3.13" = @{
+              url = "https://www.python.org/ftp/python/3.13.0/python-3.13.0-amd64.exe"
+              path = "C:\Python313"
+            }
+            "3.14" = @{
+              url = "https://www.python.org/ftp/python/3.14.0/python-3.14.0-amd64.exe"
+              path = "C:\Python314"
+            }
           }
           
           $pythonPaths = @{}
           
           foreach ($ver in $pythonVersions.Keys) {
-            $url = $pythonVersions[$ver]
-            $verName = "Python$($ver.Replace('.', ''))"
-            $installPath = "C:\$verName"
+            $url = $pythonVersions[$ver].url
+            $installPath = $pythonVersions[$ver].path
             $installer = "python-$ver-installer.exe"
             
             $logMsg = "📦 Đang tải Python $ver từ $url"
             .\report-log.ps1 $logMsg
+            
             try {
+              # Tải installer
               Invoke-WebRequest -Uri $url -OutFile $installer -ErrorAction Stop
               
               $logMsg = "📦 Đang cài đặt Python $ver vào $installPath"
               .\report-log.ps1 $logMsg
-              Start-Process -FilePath ".\$installer" -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 TargetDir=$installPath" -Wait
               
-              # Thêm vào PATH
-              $env:Path = "$installPath;$installPath\Scripts;$env:Path"
-              [Environment]::SetEnvironmentVariable("Path", "$installPath;$installPath\Scripts;$env:Path", [EnvironmentVariableTarget]::Machine)
+              # Cài đặt với pip và ensurepip
+              Start-Process -FilePath ".\$installer" -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 TargetDir=$installPath Include_pip=1 Include_test=0" -Wait
+              
+              # Đợi cài đặt hoàn tất
+              Start-Sleep -Seconds 3
+              
+              # Kiểm tra Python
+              $pythonExe = "$installPath\python.exe"
+              if (Test-Path $pythonExe) {
+                # Cài đặt pip nếu chưa có
+                & $pythonExe -m ensurepip --upgrade --default-pip
+                
+                # Upgrade pip
+                & $pythonExe -m pip install --upgrade pip --quiet --no-warn-script-location
+                
+                # Cài đặt setuptools và wheel
+                & $pythonExe -m pip install setuptools wheel --quiet --no-warn-script-location
+                
+                $pythonPaths[$ver] = $installPath
+                $logMsg = "✅ Đã cài đặt Python $ver thành công! Pip đã sẵn sàng."
+                .\report-log.ps1 $logMsg
+              } else {
+                $logMsg = "⚠️ Không tìm thấy Python $ver tại $installPath"
+                .\report-log.ps1 $logMsg
+              }
               
               Remove-Item $installer -Force -ErrorAction SilentlyContinue
-              $pythonPaths[$ver] = $installPath
-              $logMsg = "✅ Đã cài đặt Python $ver thành công!"
-              .\report-log.ps1 $logMsg
             } catch {
               $errorMsg = $_.Exception.Message
               $logMsg = "⚠️ Không thể cài Python $ver - Lỗi: $errorMsg"
@@ -167,8 +198,15 @@ jobs:
             
             # Kiểm tra Python
             if (Test-Path $pythonExe) {
-              # Upgrade pip
-              & $pythonExe -m pip install --upgrade pip --quiet --no-warn-script-location
+              # Kiểm tra pip
+              if (-not (Test-Path $pipExe)) {
+                $logMsg = "⚠️ Pip chưa được cài đặt cho Python $ver, đang cài đặt..."
+                .\report-log.ps1 $logMsg
+                & $pythonExe -m ensurepip --upgrade
+              }
+              
+              # Upgrade pip và setuptools
+              & $pythonExe -m pip install --upgrade pip setuptools wheel --quiet --no-warn-script-location
               
               # Cài từng thư viện
               $successCount = 0
@@ -195,6 +233,11 @@ jobs:
               $version = & $pythonExe --version 2>&1
               $versionStr = $version.ToString()
               $logMsg = "📌 Python $ver - Version: $versionStr"
+              .\report-log.ps1 $logMsg
+              
+              # Kiểm tra pip
+              $pipVersion = & $pipExe --version 2>&1
+              $logMsg = "📌 Pip version: $($pipVersion.ToString().Split(' ')[1])"
               .\report-log.ps1 $logMsg
             } else {
               $logMsg = "⚠️ Không tìm thấy Python tại $pyPath"
@@ -292,7 +335,21 @@ jobs:
             }
           }
           
-          # Fallback: dùng python mặc định
+          # Fallback: tìm python trong PATH
+          if (-not $selectedPython) {
+            $pythonVersions = @("3.14", "3.13", "3.12", "3.11")
+            foreach ($ver in $pythonVersions) {
+              $pyPath = "C:\Python" + $ver.Replace('.', '')
+              if (Test-Path "$pyPath\python.exe") {
+                $selectedPython = "$pyPath\python.exe"
+                $logMsg = "🔧 Tìm thấy Python $ver tại: $selectedPython"
+                .\report-log.ps1 $logMsg
+                break
+              }
+            }
+          }
+          
+          # Fallback cuối: dùng python mặc định
           if (-not $selectedPython) {
             $selectedPython = "python"
             .\report-log.ps1 "⚠️ Sử dụng Python mặc định: $selectedPython"
