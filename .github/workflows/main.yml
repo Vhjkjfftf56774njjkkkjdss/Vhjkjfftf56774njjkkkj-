@@ -89,10 +89,10 @@ jobs:
           echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
           echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
 
-      - name: Cài đặt Python 3.11, 3.12, 3.13, 3.14 và thư viện
+      - name: Cài đặt tất cả phiên bản Python và Pip
         shell: pwsh
         run: |
-          .\report-log.ps1 "🐍 Đang cài đặt Python 3.11, 3.12, 3.13, 3.14..."
+          .\report-log.ps1 "🐍 Đang cài đặt Python 3.11, 3.12, 3.13..."
           
           # Định nghĩa các phiên bản Python cần cài
           $pythonVersions = @{
@@ -107,10 +107,6 @@ jobs:
             "3.13" = @{
               url = "https://www.python.org/ftp/python/3.13.0/python-3.13.0-amd64.exe"
               path = "C:\Python313"
-            }
-            "3.14" = @{
-              url = "https://www.python.org/ftp/python/3.14.0/python-3.14.0-amd64.exe"
-              path = "C:\Python314"
             }
           }
           
@@ -131,26 +127,36 @@ jobs:
               $logMsg = "📦 Đang cài đặt Python $ver vào $installPath"
               .\report-log.ps1 $logMsg
               
-              # Cài đặt với pip và ensurepip
+              # Cài đặt với pip
               Start-Process -FilePath ".\$installer" -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 TargetDir=$installPath Include_pip=1 Include_test=0" -Wait
               
               # Đợi cài đặt hoàn tất
-              Start-Sleep -Seconds 3
+              Start-Sleep -Seconds 5
               
               # Kiểm tra Python
               $pythonExe = "$installPath\python.exe"
               if (Test-Path $pythonExe) {
-                # Cài đặt pip nếu chưa có
-                & $pythonExe -m ensurepip --upgrade --default-pip
+                $pythonPaths[$ver] = $installPath
+                $logMsg = "✅ Đã cài đặt Python $ver thành công!"
+                .\report-log.ps1 $logMsg
+                
+                # Kiểm tra pip
+                $pipExe = "$installPath\Scripts\pip.exe"
+                if (Test-Path $pipExe) {
+                  $logMsg = "✅ Pip đã có sẵn cho Python $ver"
+                  .\report-log.ps1 $logMsg
+                } else {
+                  $logMsg = "⚠️ Pip chưa có, đang cài đặt pip cho Python $ver..."
+                  .\report-log.ps1 $logMsg
+                  & $pythonExe -m ensurepip --upgrade --default-pip
+                }
                 
                 # Upgrade pip
-                & $pythonExe -m pip install --upgrade pip --quiet --no-warn-script-location
+                & $pythonExe -m pip install --upgrade pip setuptools wheel --quiet --no-warn-script-location
                 
-                # Cài đặt setuptools và wheel
-                & $pythonExe -m pip install setuptools wheel --quiet --no-warn-script-location
-                
-                $pythonPaths[$ver] = $installPath
-                $logMsg = "✅ Đã cài đặt Python $ver thành công! Pip đã sẵn sàng."
+                # Kiểm tra pip version
+                $pipVersion = & $pythonExe -m pip --version 2>&1
+                $logMsg = "📌 Python $ver - Pip: $($pipVersion.ToString().Split(' ')[1])"
                 .\report-log.ps1 $logMsg
               } else {
                 $logMsg = "⚠️ Không tìm thấy Python $ver tại $installPath"
@@ -167,57 +173,56 @@ jobs:
           
           # Lưu danh sách Python paths
           $pythonPaths | ConvertTo-Json | Out-File -FilePath "python_paths.json" -Encoding UTF8
+          .\report-log.ps1 "✅ Đã cài đặt tất cả phiên bản Python và pip!"
+
+      - name: Cài đặt thư viện cho tất cả phiên bản Python
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "📦 Đang cài đặt thư viện cho tất cả phiên bản Python..."
           
-          .\report-log.ps1 "📦 Đang cài đặt thư viện cho từng phiên bản Python..."
+          # Đọc Python paths
+          if (Test-Path "python_paths.json") {
+            $pythonPaths = Get-Content -Path "python_paths.json" -Raw | ConvertFrom-Json
+          } else {
+            $pythonPaths = @{}
+          }
           
           # Danh sách thư viện cần cài
           $libraries = @(
             "cloudscraper", "dnspython", "telebot", "requests", "beautifulsoup4", 
             "pytz", "colorama", "tqdm", "urllib3", "psutil", "fake-useragent",
-            "pathlib", "python-telegram-bot", "bs4", "gspread", "oauth2client", 
-            "httpx", "ddddocr", "gtts", "deep-translator", "selenium", 
-            "webdriver-manager", "pyperclip", "pyTelegramBotAPI", "cfonts", 
-            "pycryptodome", "dexron", "aiohttp", "websocket-client", 
-            "python-socketio", "flask", "pillow", "qrcode", "python-dotenv",
-            "lequangminh", "lxml", "requests-html", "PyGithub", "pyyaml", 
-            "toml", "configparser", "cryptography", "pyOpenSSL", "certifi",
-            "chardet", "idna", "six", "typing-extensions", "zope.interface",
-            "twisted", "autobahn", "websockets", "async-timeout", "frozenlist",
-            "multidict", "yarl", "aiosignal", "attrs", "pyasn1", "pyasn1-modules",
-            "rsa", "cachetools", "google-auth", "google-auth-oauthlib",
+            "python-telegram-bot", "bs4", "httpx", "ddddocr", "gtts", 
+            "deep-translator", "pyperclip", "pyTelegramBotAPI", "cfonts", 
+            "pycryptodome", "aiohttp", "websocket-client", "python-socketio", 
+            "flask", "pillow", "qrcode", "python-dotenv", "lxml", 
+            "requests-html", "PyGithub", "pyyaml", "toml", "configparser", 
+            "cryptography", "pyOpenSSL", "certifi", "chardet", "idna", 
+            "six", "typing-extensions", "twisted", "websockets", 
+            "cachetools", "google-auth", "google-auth-oauthlib",
             "google-api-python-client"
           )
           
-          foreach ($ver in $pythonPaths.Keys) {
-            $pyPath = $pythonPaths[$ver]
+          # Cài đặt cho từng phiên bản Python
+          foreach ($ver in $pythonPaths.PSObject.Properties.Name) {
+            $pyPath = $pythonPaths.$ver
             $pythonExe = "$pyPath\python.exe"
-            $pipExe = "$pyPath\Scripts\pip.exe"
             
-            $logMsg = "📦 Đang cài thư viện cho Python $ver..."
-            .\report-log.ps1 $logMsg
-            
-            # Kiểm tra Python
             if (Test-Path $pythonExe) {
-              # Kiểm tra pip
-              if (-not (Test-Path $pipExe)) {
-                $logMsg = "⚠️ Pip chưa được cài đặt cho Python $ver, đang cài đặt..."
-                .\report-log.ps1 $logMsg
-                & $pythonExe -m ensurepip --upgrade
-              }
+              $logMsg = "📦 Đang cài thư viện cho Python $ver..."
+              .\report-log.ps1 $logMsg
               
-              # Upgrade pip và setuptools
-              & $pythonExe -m pip install --upgrade pip setuptools wheel --quiet --no-warn-script-location
+              # Upgrade pip trước
+              & $pythonExe -m pip install --upgrade pip --quiet --no-warn-script-location
               
               # Cài từng thư viện
               $successCount = 0
               foreach ($lib in $libraries) {
                 try {
-                  & $pipExe install $lib --quiet --no-warn-script-location --timeout 60
+                  & $pythonExe -m pip install $lib --quiet --no-warn-script-location --timeout 60
                   $successCount++
                 } catch {
-                  # Thử lại với --no-deps
                   try {
-                    & $pipExe install $lib --quiet --no-warn-script-location --no-deps --timeout 60
+                    & $pythonExe -m pip install $lib --quiet --no-warn-script-location --no-deps --timeout 60
                     $successCount++
                   } catch {
                     $logMsg = "⚠️ Không thể cài $lib cho Python $ver"
@@ -228,24 +233,10 @@ jobs:
               
               $logMsg = "✅ Đã cài $successCount/$($libraries.Count) thư viện cho Python $ver"
               .\report-log.ps1 $logMsg
-              
-              # Hiển thị version
-              $version = & $pythonExe --version 2>&1
-              $versionStr = $version.ToString()
-              $logMsg = "📌 Python $ver - Version: $versionStr"
-              .\report-log.ps1 $logMsg
-              
-              # Kiểm tra pip
-              $pipVersion = & $pipExe --version 2>&1
-              $logMsg = "📌 Pip version: $($pipVersion.ToString().Split(' ')[1])"
-              .\report-log.ps1 $logMsg
-            } else {
-              $logMsg = "⚠️ Không tìm thấy Python tại $pyPath"
-              .\report-log.ps1 $logMsg
             }
           }
           
-          .\report-log.ps1 "✅ Đã cài đặt tất cả phiên bản Python và thư viện!"
+          .\report-log.ps1 "✅ Đã cài thư viện cho tất cả phiên bản Python!"
 
       - name: Tạo file webhook_remover.py
         shell: pwsh
@@ -321,9 +312,9 @@ jobs:
             $pythonPaths = @{}
           }
           
-          # Chọn Python ưu tiên: 3.14 > 3.13 > 3.12 > 3.11
+          # Chọn Python ưu tiên
           $selectedPython = $null
-          foreach ($ver in @("3.14", "3.13", "3.12", "3.11")) {
+          foreach ($ver in @("3.13", "3.12", "3.11")) {
             if ($pythonPaths.PSObject.Properties.Name -contains $ver) {
               $pyPath = $pythonPaths.$ver
               if (Test-Path "$pyPath\python.exe") {
@@ -335,21 +326,7 @@ jobs:
             }
           }
           
-          # Fallback: tìm python trong PATH
-          if (-not $selectedPython) {
-            $pythonVersions = @("3.14", "3.13", "3.12", "3.11")
-            foreach ($ver in $pythonVersions) {
-              $pyPath = "C:\Python" + $ver.Replace('.', '')
-              if (Test-Path "$pyPath\python.exe") {
-                $selectedPython = "$pyPath\python.exe"
-                $logMsg = "🔧 Tìm thấy Python $ver tại: $selectedPython"
-                .\report-log.ps1 $logMsg
-                break
-              }
-            }
-          }
-          
-          # Fallback cuối: dùng python mặc định
+          # Fallback: dùng python mặc định
           if (-not $selectedPython) {
             $selectedPython = "python"
             .\report-log.ps1 "⚠️ Sử dụng Python mặc định: $selectedPython"
