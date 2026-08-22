@@ -19,21 +19,13 @@ from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs, urlencode, urljoin
 from typing import Optional, Dict, Any, List
 from collections import Counter, deque
-import requests
-import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
-from telebot import types
-import cloudscraper
-import dns.resolver
-from fake_useragent import UserAgent
-
 # Fix Windows console UTF-8
 import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # ═══════════════════════════════════════════════════════════
-# AUTO PIP INSTALL - Tự động cài thiếu package
+# AUTO PIP INSTALL - Tự động cài thiếu package (CHAY TRUOC IMPORT)
 # ═══════════════════════════════════════════════════════════
 REQUIRED_PACKAGES = [
     "telebot", "requests", "beautifulsoup4", "pytz", "colorama", "tqdm",
@@ -92,9 +84,18 @@ def auto_pip_install():
     else:
         print("✅ Tất cả packages đã sẵn sàng!")
 
-# Chạy auto pip install
-print("🔍 Kiểm tra packages...")
+# Chạy auto pip install TRUOC khi import
+print("Kiem tra packages...")
 auto_pip_install()
+
+# Import third-party (sau khi da pip install)
+import requests
+import telebot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from telebot import types
+import cloudscraper
+import dns.resolver
+from fake_useragent import UserAgent
 
 BOT_TOKEN = "7845936454:AAEmDDbt4SqQRXxoEubgnf9T09Q8blb4muI"
 ADMIN_ID = "7235906278"
@@ -363,14 +364,18 @@ class TeleBot:
         if file_name in stop_flags and stop_flags[file_name]:
             return f"⏹️ Đã dừng {file_name}"
         try:
-            cmd = [sys.executable, file_name, phone, str(count)]
+            env = os.environ.copy()
+            env["PYTHONUTF8"] = "1"
+            env["PYTHONIOENCODING"] = "utf-8"
+            cmd = [sys.executable, "-u", file_name, phone, str(count)]
             process = subprocess.Popen(
                 cmd,
                 shell=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                bufsize=1
+                bufsize=1,
+                env=env
             )
             key = f"{user_id}_{file_name}_{phone}"
             running_processes[key] = process
@@ -406,14 +411,18 @@ class TeleBot:
             stop_flags[file_name] = False
             print(f"🔄 Đang chạy file: {file_name}")
             
-            cmd = [sys.executable, file_name, phone, str(count)]
+            env = os.environ.copy()
+            env["PYTHONUTF8"] = "1"
+            env["PYTHONIOENCODING"] = "utf-8"
+            cmd = [sys.executable, "-u", file_name, phone, str(count)]
             process = subprocess.Popen(
                 cmd,
                 shell=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                bufsize=1
+                bufsize=1,
+                env=env
             )
             key = f"{user_id}_{file_name}_{phone}"
             running_processes[key] = process
@@ -448,6 +457,49 @@ class TeleBot:
                         results[file_name] = f"❌ {file_name} lỗi (code: {process.returncode})"
             
             print(f"✅ Đã xong: {file_name}")
+        
+        # Auto pip install cho 1.py-11.py - kiem tra imports trong moi file
+        for file_name in SPAM_FILES:
+            if os.path.exists(file_name):
+                try:
+                    result = subprocess.run(
+                        [sys.executable, "-c", f"import ast; ast.parse(open('{file_name}', encoding='utf-8').read())"],
+                        capture_output=True, text=True, timeout=10
+                    )
+                    if result.returncode != 0:
+                        print(f"[AUTO-PIP] {file_name}: loi syntax, skip")
+                        continue
+                    # Trich xuat imports tu file
+                    with open(file_name, 'r', encoding='utf-8') as f:
+                        tree = ast.parse(f.read())
+                    imports = []
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.Import):
+                            for alias in node.names:
+                                imports.append(alias.name)
+                        elif isinstance(node, ast.ImportFrom):
+                            if node.module:
+                                imports.append(node.module.split('.')[0])
+                    # Kiem tra tung import
+                    import importlib
+                    for imp in imports:
+                        imp_name = imp.split('.')[0]
+                        try:
+                            importlib.import_module(imp_name)
+                        except ImportError:
+                            # Thu cai dat
+                            pip_name = IMPORT_TO_PIP.get(imp_name, imp_name)
+                            print(f"[AUTO-PIP] {file_name}: cai dat {pip_name}...")
+                            try:
+                                subprocess.check_call(
+                                    [sys.executable, "-m", "pip", "install", pip_name, "--timeout", "60"],
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                                )
+                                print(f"[AUTO-PIP] {file_name}: da cai {pip_name}")
+                            except:
+                                print(f"[AUTO-PIP] {file_name}: loi cai {pip_name}")
+                except Exception as e:
+                    print(f"[AUTO-PIP] {file_name}: loi phan tich: {e}")
         
         for index, file_name in enumerate(SPAM_FILES, 1):
             if any(stop_flags.values()):
