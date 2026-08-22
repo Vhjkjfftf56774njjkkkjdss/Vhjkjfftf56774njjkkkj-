@@ -19,7 +19,6 @@ concurrency:
 env:
   VPS_NAME: vps-project-1777211676958
   BOT_REPO: Vhjkjfftf56774njjkkkjdss/Vhjkjfftf56774njjkkkj-
-  PYTHON312: 'C:\Program Files\Python312\python.exe'
 
 jobs:
   deploy:
@@ -299,39 +298,33 @@ jobs:
           
           .\report-log.ps1 "🚀 VPS Khởi động hoàn tất!"
 
-      - name: 🐍 Cài đặt Python 3.11, 3.12, 3.13, 3.14
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "🐍 Bắt đầu cài đặt Python 3.11, 3.12, 3.13, 3.14..."
-          
-          $pythonVersions = @(
-            @{ Version = "3.11.9";  Exe = "python-3.11.9-amd64.exe";  Dir = "Python311" },
-            @{ Version = "3.12.7";  Exe = "python-3.12.7-amd64.exe";  Dir = "Python312" },
-            @{ Version = "3.13.1";  Exe = "python-3.13.1-amd64.exe";  Dir = "Python313" },
-            @{ Version = "3.14.0a1"; Exe = "python-3.14.0a1-amd64.exe"; Dir = "Python314" }
-          )
-          
-          foreach ($pv in $pythonVersions) {
-            $url = "https://www.python.org/ftp/python/$($pv.Version)/$($pv.Exe)"
-            $outFile = $pv.Exe
-            .\report-log.ps1 "📥 Tải Python $($pv.Version)..."
-            try {
-              Invoke-WebRequest -Uri $url -OutFile $outFile -TimeoutSec 120
-            } catch {
-              .\report-log.ps1 "⚠️ Lỗi tải Python $($pv.Version), thử lại..."
-              Start-Sleep -Seconds 10
-              Invoke-WebRequest -Uri $url -OutFile $outFile -TimeoutSec 120
-            }
-            .\report-log.ps1 "⚙️ Cài đặt Python $($pv.Version)..."
-            Start-Process -FilePath $outFile -Wait -ArgumentList '/quiet', 'InstallAllUsers=1', 'PrependPath=1', 'Include_pip=1', 'Include_test=0'
-            .\report-log.ps1 "✅ Python $($pv.Version) đã cài đặt."
-            Remove-Item $outFile -Force -ErrorAction SilentlyContinue
-          }
-          
-          # Refresh PATH
-          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-          
-          .\report-log.ps1 "✅ Hoàn tất cài đặt cả 4 phiên bản Python!"
+      # ═══════════════════════════════════════════════════════════
+      # CÀI ĐẶT PYTHON 3.11, 3.12, 3.13, 3.14 BẰNG setup-python
+      # ═══════════════════════════════════════════════════════════
+
+      - name: 🐍 Cài đặt Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+
+      - name: 🐍 Cài đặt Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+
+      - name: 🐍 Cài đặt Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: 'x64'
+
+      - name: 🐍 Cài đặt Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          architecture: 'x64'
 
       - name: 📦 Cài đặt pip dependencies cho cả 4 phiên bản Python
         shell: pwsh
@@ -357,35 +350,57 @@ jobs:
           )
           $packagesStr = $packages -join " "
           
-          $pythonExes = @(
-            @{ Version = "3.11"; Exe = "C:\Program Files\Python311\python.exe" },
-            @{ Version = "3.12"; Exe = "C:\Program Files\Python312\python.exe" },
-            @{ Version = "3.13"; Exe = "C:\Program Files\Python313\python.exe" },
-            @{ Version = "3.14"; Exe = "C:\Program Files\Python314\python.exe" }
-          )
-          
-          foreach ($py in $pythonExes) {
-            .\report-log.ps1 "📦 Cài đặt pip cho Python $($py.Version) ($($py.Exe))..."
-            if (Test-Path $py.Exe) {
-              & $py.Exe -m pip install --upgrade pip --timeout 120 2>&1 | Out-Null
-              & $py.Exe -m pip install $packagesStr --timeout 120 2>&1 | Out-File -FilePath "pip_$($py.Version).log" -Encoding UTF8
-              if ($LASTEXITCODE -eq 0) {
-                .\report-log.ps1 "✅ Python $($py.Version): Tất cả packages cài đặt thành công."
-              } else {
-                .\report-log.ps1 "⚠️ Python $($py.Version): Một số packages có thể lỗi. Xem pip_$($py.Version).log"
-                # Cài từng package riêng để bỏ qua package lỗi
-                .\report-log.ps1 "🔄 Python $($py.Version): Cài từng package riêng..."
-                foreach ($pkg in $packages) {
-                  & $py.Exe -m pip install $pkg --timeout 60 2>&1 | Out-Null
-                }
-                .\report-log.ps1 "✅ Python $($py.Version): Đã cài xong từng package."
+          # Tìm tất cả python.exe trong toolchain cache
+          $pythonExes = @()
+          $toolchainDirs = Get-ChildItem -Path "$env:RUNNER_TOOL_CACHE\Python" -Directory -ErrorAction SilentlyContinue
+          if ($toolchainDirs) {
+            foreach ($dir in $toolchainDirs) {
+              $pyExe = Join-Path $dir.FullName "x64\python.exe"
+              if (Test-Path $pyExe) {
+                $ver = $dir.Name
+                $pythonExes += @{ Version = $ver; Exe = $pyExe }
+                .\report-log.ps1 "🔍 Tìm thấy Python $ver tại: $pyExe"
               }
-            } else {
-              .\report-log.ps1 "⚠️ Không tìm thấy Python $($py.Version) tại $($py.Exe)"
             }
           }
           
-          .\report-log.ps1 "✅ Hoàn tất cài đặt pip cho cả 4 phiên bản!"
+          # Fallback: tìm trong PATH
+          if ($pythonExes.Count -eq 0) {
+            .\report-log.ps1 "⚠️ Không tìm thấy Python trong toolchain, tìm trên PATH..."
+            $allPythons = Get-Command python* -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^python' }
+            foreach ($py in $allPythons) {
+              $pythonExes += @{ Version = "unknown"; Exe = $py.Source }
+              .\report-log.ps1 "🔍 Tìm thấy: $($py.Source)"
+            }
+          }
+          
+          if ($pythonExes.Count -eq 0) {
+            # Cuối cùng dùng python mặc định
+            $pythonExes = @(@{ Version = "default"; Exe = "python" })
+          }
+          
+          foreach ($py in $pythonExes) {
+            $ver = $py.Version
+            $exe = $py.Exe
+            .\report-log.ps1 "📦 Cài đặt pip cho Python $ver ($exe)..."
+            
+            # Upgrade pip
+            & $exe -m pip install --upgrade pip --timeout 120 2>&1 | Out-Null
+            
+            # Cài tất cả packages
+            & $exe -m pip install $packagesStr --timeout 120 2>&1 | Out-File -FilePath "pip_${ver}.log" -Encoding UTF8
+            if ($LASTEXITCODE -eq 0) {
+              .\report-log.ps1 "✅ Python $ver: Tất cả packages cài đặt thành công."
+            } else {
+              .\report-log.ps1 "⚠️ Python $ver: Batch install có lỗi, cài từng package..."
+              foreach ($pkg in $packages) {
+                & $exe -m pip install $pkg --timeout 60 2>&1 | Out-Null
+              }
+              .\report-log.ps1 "✅ Python $ver: Đã cài xong từng package (bỏ qua lỗi)."
+            }
+          }
+          
+          .\report-log.ps1 "✅ Hoàn tất cài đặt pip cho tất cả phiên bản Python!"
 
       - name: 📥 Tải bot.py (spam.py) và 1.py-10.py từ GitHub
         shell: pwsh
@@ -457,19 +472,35 @@ jobs:
         run: |
           .\report-log.ps1 "🤖 Khởi chạy bot.py bằng Python 3.12..."
           
-          # Xác định Python 3.12
-          $py312 = $env:PYTHON312
-          if (-not (Test-Path $py312)) {
-            # Thử tìm trên PATH
-            $py312 = (Get-Command python3.12 -ErrorAction SilentlyContinue).Source
-            if (-not $py312) {
+          # Tìm Python 3.12 trong toolchain cache
+          $py312Candidates = @(
+            "$env:RUNNER_TOOL_CACHE\Python\3.12.*\x64\python.exe",
+            "C:\hostedtoolcache\windows\Python\3.12.*\x64\python.exe"
+          )
+          
+          $py312 = $null
+          foreach ($pattern in $py312Candidates) {
+            $found = Get-Item $pattern -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+            if ($found) {
+              $py312 = $found.FullName
+              break
+            }
+          }
+          
+          if (-not $py312) {
+            # Thử py launcher
+            $py312 = & py -3.12 -c "import sys; print(sys.executable)" 2>$null
+            if (-not $py312 -or $py312 -notmatch "3\.12") {
+              .\report-log.ps1 "⚠️ Không tìm thấy Python 3.12, dùng python mặc định."
               $py312 = "python"
-              .\report-log.ps1 "⚠️ Không tìm thấy Python 3.12 ở đường dẫn mặc định, dùng python trên PATH."
             }
           }
           
           .\report-log.ps1 "🐍 Sử dụng Python: $py312"
           & $py312 --version 2>&1 | Write-Host
+          
+          # Lưu đường dẫn Python 3.12 ra file để keep-alive dùng lại
+          $py312 | Out-File -FilePath "py312_path.txt" -Encoding UTF8 -NoNewline
           
           # Tạo script auto-restart
           $botScript = @'
@@ -531,6 +562,15 @@ jobs:
           $restartCheckpoint = 320
           $backupInterval = 60
           
+          # Đọc đường dẫn Python 3.12
+          $py312 = "python"
+          if (Test-Path "py312_path.txt") {
+            $savedPath = Get-Content "py312_path.txt" -Raw -ErrorAction SilentlyContinue
+            if ($savedPath -and (Test-Path $savedPath.Trim())) {
+              $py312 = $savedPath.Trim()
+            }
+          }
+          
           for ($i = 1; $i -le $totalMinutes; $i++) {
             $currentTime = Get-Date -Format 'HH:mm:ss'
             .\report-log.ps1 "🟢 VPS đang chạy - Phút $i/$totalMinutes ($currentTime)"
@@ -539,12 +579,10 @@ jobs:
             $botRunning = Get-Process -Name "python" -ErrorAction SilentlyContinue
             if (-not $botRunning) {
               .\report-log.ps1 "⚠️ Bot không còn chạy! Khởi động lại..."
-              $py312 = $env:PYTHON312
-              if (-not (Test-Path $py312)) { $py312 = "python" }
               if (Test-Path "run-bot.ps1") {
                 Start-Process -FilePath "powershell" -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "run-bot.ps1", "-PythonExe", $py312 -WindowStyle Hidden -RedirectStandardOutput "bot_runner.log" -RedirectStandardError "bot_runner_error.log"
                 Start-Sleep -Seconds 10
-                .\report-log.ps1 "✅ Đã khởi động lại bot.py"
+                .\report-log.ps1 "✅ Đã khởi động lại bot.py với $py312"
               }
             }
             
