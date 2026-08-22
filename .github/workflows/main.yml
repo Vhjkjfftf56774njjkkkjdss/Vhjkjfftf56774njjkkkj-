@@ -402,24 +402,34 @@ jobs:
           
           .\report-log.ps1 "✅ Hoàn tất cài đặt pip cho tất cả phiên bản Python!"
 
-      - name: 📥 Tải bot.py (spam.py) và 1.py-10.py từ GitHub
+      - name: 📥 Tải bot.py và 1.py-11.py từ GitHub
         shell: pwsh
         run: |
           .\report-log.ps1 "📥 Đang tải bot files từ GitHub repo..."
           
           $repoRaw = "https://raw.githubusercontent.com/$env:BOT_REPO/main"
-          
-          # Tải spam.py -> bot.py
-          .\report-log.ps1 "📥 Tải spam.py -> bot.py..."
           $maxDl = 5
+          $failedFiles = @()
+          
+          # Tải bot.py (file đã chỉnh sửa, không phải spam.py)
+          .\report-log.ps1 "📥 Tải bot.py..."
           for ($i = 1; $i -le $maxDl; $i++) {
             try {
-              Invoke-WebRequest -Uri "$repoRaw/spam.py" -OutFile "bot.py" -TimeoutSec 60
+              Invoke-WebRequest -Uri "$repoRaw/bot.py" -OutFile "bot.py" -TimeoutSec 60
               .\report-log.ps1 "✅ Tải bot.py thành công ($((Get-Item bot.py).Length) bytes)."
               break
             } catch {
               .\report-log.ps1 "⚠️ Lỗi tải bot.py (lần $i/$maxDl): $_"
-              if ($i -eq $maxDl) { .\report-log.ps1 "❌ Không tải được bot.py!"; exit 1 }
+              if ($i -eq $maxDl) {
+                .\report-log.ps1 "⚠️ Không tìm thấy bot.py trên repo, thử tải spam.py..."
+                try {
+                  Invoke-WebRequest -Uri "$repoRaw/spam.py" -OutFile "bot.py" -TimeoutSec 60
+                  .\report-log.ps1 "✅ Tải spam.py -> bot.py thành công ($((Get-Item bot.py).Length) bytes)."
+                } catch {
+                  .\report-log.ps1 "❌ Không tải được bot.py!"
+                  exit 1
+                }
+              }
               Start-Sleep -Seconds 10
             }
           }
