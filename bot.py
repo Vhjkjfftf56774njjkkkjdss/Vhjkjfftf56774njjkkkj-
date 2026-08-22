@@ -501,6 +501,12 @@ class TeleBot:
                 except Exception as e:
                     print(f"[AUTO-PIP] {file_name}: loi phan tich: {e}")
         
+        # CHAY SONG SONG TAT CA 1.py-11.py CUNG LUC
+        print(f"\n{'='*50}")
+        print(f"🚀 CHAY SONG SONG {len(SPAM_FILES)} FILES CUNG LUC")
+        print(f"{'='*50}")
+        
+        threads = []
         for index, file_name in enumerate(SPAM_FILES, 1):
             if any(stop_flags.values()):
                 print("⏹️ Đã nhận lệnh dừng")
@@ -509,11 +515,15 @@ class TeleBot:
                         results[f] = "⏹️ Chưa chạy (bị dừng)"
                 break
             
-            print(f"\n{'='*50}")
-            print(f"📁 CHẠY FILE {index}/{len(SPAM_FILES)}: {file_name}")
-            print(f"{'='*50}")
-            
-            run_file_once(file_name)
+            print(f"📁 KHỞI CHẠY FILE {index}/{len(SPAM_FILES)}: {file_name}")
+            t = threading.Thread(target=run_file_once, args=(file_name,))
+            t.daemon = True
+            t.start()
+            threads.append(t)
+        
+        # Cho tat ca thread xong
+        for t in threads:
+            t.join()
         
         print(f"\n✅ ĐÃ CHẠY XONG TẤT CẢ {len(SPAM_FILES)} FILES")
         
