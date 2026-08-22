@@ -570,173 +570,46 @@ jobs:
           .\report-log.ps1 "🤖 Hoàn tất test bot.py!"
           exit 0
 
-      - name: 🚀 Khởi chạy bot.py nền với auto-restart
-        shell: pwsh
+      - name: 🤖 Chay bot.py bang cmd + keep-alive (hien toan bo log)
+        shell: cmd
         run: |
-          .\report-log.ps1 "🚀 Khởi chạy bot.py nền với auto-restart..."
+          chcp 65001 >nul
+          echo [BOT] Tim Python 3.12...
           
-          $py312 = Get-Content "py312_path.txt" -Raw -ErrorAction SilentlyContinue
-          if (-not $py312 -or -not (Test-Path $py312.Trim())) { $py312 = "python" }
-          else { $py312 = $py312.Trim() }
+          set "PY312="
+          for /d %%D in ("C:\hostedtoolcache\windows\Python\3.12.*") do set "PY312=%%D\x64\python.exe"
           
-          # Tạo script auto-restart với lock file
-          $botScript = @'
-          param([string]$PythonExe)
-          $botFile = "bot.py"
-          $lockFile = "bot_runner.lock"
-          $maxRetries = 999
+          if not defined PY312 (
+            for /d %%D in ("%RUNNER_TOOL_CACHE%\Python\3.12.*") do set "PY312=%%D\x64\python.exe"
+          )
           
-          # Lock file để chống overlap
-          if (Test-Path $lockFile) {
-            $oldPid = Get-Content $lockFile -Raw -ErrorAction SilentlyContinue
-            $oldPid = $oldPid.Trim()
-            if ($oldPid -and (Get-Process -Id $oldPid -ErrorAction SilentlyContinue)) {
-              Write-Host "[BOT] Đã có runner khác đang chạy (PID $oldPid). Thoát."
-              exit 0
-            }
-          }
-          $PID | Out-File -FilePath $lockFile -Encoding UTF8 -NoNewline
+          if not defined PY312 (
+            echo [BOT] Khong tim thay Python 3.12, dung python mac dinh
+            set "PY312=python"
+          )
           
-          try {
-            for ($i = 1; $i -le $maxRetries; $i++) {
-                $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-                Write-Host "[$timestamp] [BOT] Khởi động bot.py (lần $i) - $PythonExe"
-                
-                # Xoá log cũ
-                if (Test-Path "bot_stdout.log") { Remove-Item "bot_stdout.log" -Force }
-                if (Test-Path "bot_stderr.log") { Remove-Item "bot_stderr.log" -Force }
-                
-                # Chạy bot
-                $proc = Start-Process -FilePath $PythonExe -ArgumentList $botFile -WorkingDirectory (Get-Location) -NoNewWindow -PassThru -RedirectStandardOutput "bot_stdout.log" -RedirectStandardError "bot_stderr.log"
-                $proc.WaitForExit()
-                $exitCode = $proc.ExitCode
-                
-                # Append stderr vào bot_crash.log (persistent, không xoá)
-                if (Test-Path "bot_stderr.log") {
-                  Add-Content -Path "bot_crash.log" -Value "=== Crash lúc $timestamp (exit $exitCode) ===" -Encoding UTF8
-                  Get-Content "bot_stderr.log" -ErrorAction SilentlyContinue | Add-Content -Path "bot_crash.log" -Encoding UTF8
-                }
-                
-                Write-Host "[$timestamp] [BOT] Thoát mã: $exitCode"
-                if (Test-Path "bot_stderr.log") {
-                  Get-Content "bot_stderr.log" -ErrorAction SilentlyContinue | Select-Object -Last 10 | ForEach-Object { Write-Host "[BOT ERR] $_" }
-                }
-                
-                Write-Host "[BOT] Restart sau 10 giây..."
-                Start-Sleep -Seconds 10
-            }
-          } finally {
-            Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
-          }
-          '@
-          $botScript | Out-File -FilePath "run-bot.ps1" -Encoding UTF8
+          echo [BOT] Python 3.12: %PY312%
+          "%PY312%" --version
           
-          # Xoá lock cũ
-          Remove-Item "bot_runner.lock" -Force -ErrorAction SilentlyContinue
+          set /a TOTAL_SECONDS=19800
+          set /a RETRY=1
           
-          # Khởi chạy runner trong nền
-          Start-Process -FilePath "powershell" -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "run-bot.ps1", "-PythonExe", $py312 -WindowStyle Hidden -RedirectStandardOutput "bot_runner.log" -RedirectStandardError "bot_runner_error.log"
-          Start-Sleep -Seconds 15
+          :RUNBOT
+          echo.
+          echo =======================================================
+          echo [BOT] Khoi dong bot.py (lan %RETRY%)
+          echo =======================================================
           
-          # Kiểm tra
-          $botProc = Get-Process -Name "python" -ErrorAction SilentlyContinue
-          if ($botProc) {
-            .\report-log.ps1 "✅ bot.py đang chạy (PID $($botProc.Id -join ','))!"
-          } else {
-            .\report-log.ps1 "⚠️ bot.py chưa chạy. Log gần nhất:"
-            if (Test-Path "bot_stderr.log") { Get-Content "bot_stderr.log" -ErrorAction SilentlyContinue | Select-Object -Last 10 | ForEach-Object { .\report-log.ps1 "   ❌ $_" } }
-            if (Test-Path "bot_crash.log") { Get-Content "bot_crash.log" -ErrorAction SilentlyContinue | Select-Object -Last 10 | ForEach-Object { .\report-log.ps1 "   💥 $_" } }
-            if (Test-Path "bot_runner_error.log") { Get-Content "bot_runner_error.log" -ErrorAction SilentlyContinue | Select-Object -Last 5 | ForEach-Object { .\report-log.ps1 "   ⚙️ $_" } }
-          }
+          REM Chay bot truc tiep bang cmd - output hien ngay tren man hinh
+          REM -u: unbuffered, khong delay output
+          "%PY312%" -u bot.py
+          set EXITCODE=%ERRORLEVEL%
           
-          .\report-log.ps1 "🚀 Hoàn tất khởi chạy bot.py!"
+          echo.
+          echo [BOT] bot.py thoat ma: %EXITCODE%
+          echo [BOT] Restart sau 10 giay...
+          timeout /t 10 /nobreak >nul
+          
+          set /a RETRY+=1
+          goto RUNBOT
 
-      - name: ♻️ Giữ VPS sống (Keep-Alive Loop)
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "🚀 VPS Khởi động hoàn tất!"
-          
-          mkdir -Force ".backup"
-          
-          $totalMinutes = 330
-          $restartCheckpoint = 320
-          $backupInterval = 60
-          
-          # Đọc đường dẫn Python 3.12
-          $py312 = "python"
-          if (Test-Path "py312_path.txt") {
-            $savedPath = Get-Content "py312_path.txt" -Raw -ErrorAction SilentlyContinue
-            if ($savedPath -and (Test-Path $savedPath.Trim())) {
-              $py312 = $savedPath.Trim()
-            }
-          }
-          
-          for ($i = 1; $i -le $totalMinutes; $i++) {
-            $currentTime = Get-Date -Format 'HH:mm:ss'
-            .\report-log.ps1 "🟢 VPS đang chạy - Phút $i/$totalMinutes ($currentTime)"
-            
-            # Kiểm tra bot: chỉ restart nếu KHÔNG có run-bot.ps1 chạy (tránh overlap)
-            $runnerActive = $false
-            if (Test-Path "bot_runner.lock") {
-              $lockPid = (Get-Content "bot_runner.lock" -Raw -ErrorAction SilentlyContinue).Trim()
-              if ($lockPid -and (Get-Process -Id $lockPid -ErrorAction SilentlyContinue)) {
-                $runnerActive = $true
-              }
-            }
-            # Cũng check xem có powershell process nào đang chạy run-bot.ps1 không
-            if (-not $runnerActive) {
-              $psProcs = Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue
-              foreach ($p in $psProcs) {
-                if ($p.CommandLine -match "run-bot\.ps1") { $runnerActive = $true; break }
-              }
-            }
-            
-            if (-not $runnerActive) {
-              .\report-log.ps1 "⚠️ Bot runner đã chết! Khởi động lại..."
-              Remove-Item "bot_runner.lock" -Force -ErrorAction SilentlyContinue
-              if (Test-Path "run-bot.ps1") {
-                Start-Process -FilePath "powershell" -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "run-bot.ps1", "-PythonExe", $py312 -WindowStyle Hidden -RedirectStandardOutput "bot_runner.log" -RedirectStandardError "bot_runner_error.log"
-                Start-Sleep -Seconds 10
-                .\report-log.ps1 "✅ Đã khởi động lại bot runner"
-              }
-            } else {
-              # Bot runner đang hoạt động, log crash gần nhất nếu có
-              if (Test-Path "bot_crash.log") {
-                $crashSize = (Get-Item "bot_crash.log").Length
-                if ($crashSize -gt 0 -and ($i % 10 -eq 0)) {
-                  $lastCrash = Get-Content "bot_crash.log" -Tail 3 -ErrorAction SilentlyContinue
-                  .\report-log.ps1 "💥 Bot crash gần nhất: $($lastCrash -join ' | ')"
-                }
-              }
-            }
-            
-            if ($i % $backupInterval -eq 0) {
-              .\report-log.ps1 "💾 Đang sao lưu dữ liệu..."
-              $filesToBackup = @()
-              if (Test-Path "links") { $filesToBackup += "links" }
-              if (Test-Path "remote-link.txt") { $filesToBackup += "remote-link.txt" }
-              if (Test-Path "*.log") { $filesToBackup += Get-ChildItem -Filter "*.log" | Select-Object -ExpandProperty Name }
-              
-              if ($filesToBackup.Count -gt 0) {
-                try {
-                  $backupName = "$env:VPS_NAME`_$(Get-Date -Format 'yyyyMMdd_HHmm').zip"
-                  Compress-Archive -Path $filesToBackup -DestinationPath ".backup/$backupName" -Force
-                  
-                  git add .backup/$backupName
-                  git commit -m "💾 Backup - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" --allow-empty
-                  git push origin main --force-with-lease
-                  .\report-log.ps1 "✅ Sao lưu thành công: $backupName"
-                } catch {
-                  .\report-log.ps1 "⚠️ Sao lưu thất bại."
-                }
-              }
-            }
-            
-            if ($i -eq $restartCheckpoint) {
-              .\report-log.ps1 "🔁 Chuẩn bị khởi động lại sau $($totalMinutes - $i) phút..."
-            }
-            
-            Start-Sleep -Seconds 60
-          }
-          
-          .\report-log.ps1 "⏰ Phiên hoạt động hoàn tất. Hệ thống sẽ tự động khởi động lại sau 5h."
