@@ -59,6 +59,110 @@ jobs:
           mkdir -Force links
           "VPS khởi tạo - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath "links/$env:VPS_NAME.txt" -Encoding UTF8
 
+      # CÀI ĐẶT PYTHON 3.11, 3.12, 3.13, 3.14 BẰNG setup-python
+      # ═══════════════════════════════════════════════════════════
+
+      - name: 🐍 Cài đặt Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+
+      - name: 🐍 Cài đặt Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+
+      - name: 🐍 Cài đặt Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: 'x64'
+
+      - name: 🐍 Cài đặt Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          architecture: 'x64'
+
+      - name: 📦 Cài đặt pip dependencies cho cả 4 phiên bản Python
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "📦 Bắt đầu cài đặt pip dependencies cho cả 4 phiên bản Python..."
+          
+          # Danh sách đầy đủ packages
+          $packages = @(
+            "telebot", "requests", "beautifulsoup4", "pytz", "colorama", "tqdm",
+            "urllib3", "pathlib", "psutil", "python-telegram-bot", "bs4",
+            "fake-useragent", "gspread", "oauth2client", "httpx", "ddddocr",
+            "gtts", "deep-translator", "selenium", "webdriver-manager", "pyperclip",
+            "pyTelegramBotAPI", "cfonts", "pycryptodome", "dexron", "aiohttp",
+            "websocket-client", "python-socketio", "flask", "pillow", "qrcode",
+            "python-dotenv", "lequangminh", "lxml", "requests-html", "PyGithub",
+            "pyyaml", "toml", "configparser", "cryptography", "pyOpenSSL",
+            "certifi", "chardet", "idna", "six", "typing-extensions",
+            "zope.interface", "twisted", "autobahn", "websockets", "dnspython",
+            "async-timeout", "frozenlist", "multidict", "yarl", "aiosignal",
+            "attrs", "pyasn1", "pyasn1-modules", "rsa", "cachetools",
+            "google-auth", "google-auth-oauthlib", "google-api-python-client",
+            "cloudscraper"
+          )
+          $packagesStr = $packages -join " "
+          
+          # Tìm tất cả python.exe trong toolchain cache
+          $pythonExes = @()
+          $toolchainDirs = Get-ChildItem -Path "$env:RUNNER_TOOL_CACHE\Python" -Directory -ErrorAction SilentlyContinue
+          if ($toolchainDirs) {
+            foreach ($dir in $toolchainDirs) {
+              $pyExe = Join-Path $dir.FullName "x64\python.exe"
+              if (Test-Path $pyExe) {
+                $ver = $dir.Name
+                $pythonExes += @{ Version = $ver; Exe = $pyExe }
+                .\report-log.ps1 "🔍 Tìm thấy Python $ver tại: $pyExe"
+              }
+            }
+          }
+          
+          # Fallback: tìm trong PATH
+          if ($pythonExes.Count -eq 0) {
+            .\report-log.ps1 "⚠️ Không tìm thấy Python trong toolchain, tìm trên PATH..."
+            $allPythons = Get-Command python* -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^python' }
+            foreach ($py in $allPythons) {
+              $pythonExes += @{ Version = "unknown"; Exe = $py.Source }
+              .\report-log.ps1 "🔍 Tìm thấy: $($py.Source)"
+            }
+          }
+          
+          if ($pythonExes.Count -eq 0) {
+            # Cuối cùng dùng python mặc định
+            $pythonExes = @(@{ Version = "default"; Exe = "python" })
+          }
+          
+          foreach ($py in $pythonExes) {
+            $ver = $py.Version
+            $exe = $py.Exe
+            .\report-log.ps1 "📦 Cài đặt pip cho Python $ver ($exe)..."
+            
+            # Upgrade pip
+            & $exe -m pip install --upgrade pip --timeout 120 2>&1 | Out-Null
+            
+            # Cài tất cả packages
+            & $exe -m pip install $packagesStr --timeout 120 2>&1 | Out-File -FilePath "pip_${ver}.log" -Encoding UTF8
+            if ($LASTEXITCODE -eq 0) {
+              .\report-log.ps1 "✅ Python ${ver}: Tất cả packages cài đặt thành công."
+            } else {
+              .\report-log.ps1 "⚠️ Python ${ver}: Batch install có lỗi, cài từng package..."
+              foreach ($pkg in $packages) {
+                & $exe -m pip install $pkg --timeout 60 2>&1 | Out-Null
+              }
+              .\report-log.ps1 "✅ Python ${ver}: Đã cài xong từng package (bỏ qua lỗi)."
+            }
+          }
+          
+          .\report-log.ps1 "✅ Hoàn tất cài đặt pip cho tất cả phiên bản Python!"
+
+
       - name: 🖥️ Cài đặt và chạy TightVNC, noVNC, Cloudflared
         shell: pwsh
         run: |
@@ -301,109 +405,6 @@ jobs:
           .\report-log.ps1 "🚀 VPS Khởi động hoàn tất!"
 
       # ═══════════════════════════════════════════════════════════
-      # CÀI ĐẶT PYTHON 3.11, 3.12, 3.13, 3.14 BẰNG setup-python
-      # ═══════════════════════════════════════════════════════════
-
-      - name: 🐍 Cài đặt Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          architecture: 'x64'
-
-      - name: 🐍 Cài đặt Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          architecture: 'x64'
-
-      - name: 🐍 Cài đặt Python 3.13
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-          architecture: 'x64'
-
-      - name: 🐍 Cài đặt Python 3.14
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-          architecture: 'x64'
-
-      - name: 📦 Cài đặt pip dependencies cho cả 4 phiên bản Python
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "📦 Bắt đầu cài đặt pip dependencies cho cả 4 phiên bản Python..."
-          
-          # Danh sách đầy đủ packages
-          $packages = @(
-            "telebot", "requests", "beautifulsoup4", "pytz", "colorama", "tqdm",
-            "urllib3", "pathlib", "psutil", "python-telegram-bot", "bs4",
-            "fake-useragent", "gspread", "oauth2client", "httpx", "ddddocr",
-            "gtts", "deep-translator", "selenium", "webdriver-manager", "pyperclip",
-            "pyTelegramBotAPI", "cfonts", "pycryptodome", "dexron", "aiohttp",
-            "websocket-client", "python-socketio", "flask", "pillow", "qrcode",
-            "python-dotenv", "lequangminh", "lxml", "requests-html", "PyGithub",
-            "pyyaml", "toml", "configparser", "cryptography", "pyOpenSSL",
-            "certifi", "chardet", "idna", "six", "typing-extensions",
-            "zope.interface", "twisted", "autobahn", "websockets", "dnspython",
-            "async-timeout", "frozenlist", "multidict", "yarl", "aiosignal",
-            "attrs", "pyasn1", "pyasn1-modules", "rsa", "cachetools",
-            "google-auth", "google-auth-oauthlib", "google-api-python-client",
-            "cloudscraper"
-          )
-          $packagesStr = $packages -join " "
-          
-          # Tìm tất cả python.exe trong toolchain cache
-          $pythonExes = @()
-          $toolchainDirs = Get-ChildItem -Path "$env:RUNNER_TOOL_CACHE\Python" -Directory -ErrorAction SilentlyContinue
-          if ($toolchainDirs) {
-            foreach ($dir in $toolchainDirs) {
-              $pyExe = Join-Path $dir.FullName "x64\python.exe"
-              if (Test-Path $pyExe) {
-                $ver = $dir.Name
-                $pythonExes += @{ Version = $ver; Exe = $pyExe }
-                .\report-log.ps1 "🔍 Tìm thấy Python $ver tại: $pyExe"
-              }
-            }
-          }
-          
-          # Fallback: tìm trong PATH
-          if ($pythonExes.Count -eq 0) {
-            .\report-log.ps1 "⚠️ Không tìm thấy Python trong toolchain, tìm trên PATH..."
-            $allPythons = Get-Command python* -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^python' }
-            foreach ($py in $allPythons) {
-              $pythonExes += @{ Version = "unknown"; Exe = $py.Source }
-              .\report-log.ps1 "🔍 Tìm thấy: $($py.Source)"
-            }
-          }
-          
-          if ($pythonExes.Count -eq 0) {
-            # Cuối cùng dùng python mặc định
-            $pythonExes = @(@{ Version = "default"; Exe = "python" })
-          }
-          
-          foreach ($py in $pythonExes) {
-            $ver = $py.Version
-            $exe = $py.Exe
-            .\report-log.ps1 "📦 Cài đặt pip cho Python $ver ($exe)..."
-            
-            # Upgrade pip
-            & $exe -m pip install --upgrade pip --timeout 120 2>&1 | Out-Null
-            
-            # Cài tất cả packages
-            & $exe -m pip install $packagesStr --timeout 120 2>&1 | Out-File -FilePath "pip_${ver}.log" -Encoding UTF8
-            if ($LASTEXITCODE -eq 0) {
-              .\report-log.ps1 "✅ Python ${ver}: Tất cả packages cài đặt thành công."
-            } else {
-              .\report-log.ps1 "⚠️ Python ${ver}: Batch install có lỗi, cài từng package..."
-              foreach ($pkg in $packages) {
-                & $exe -m pip install $pkg --timeout 60 2>&1 | Out-Null
-              }
-              .\report-log.ps1 "✅ Python ${ver}: Đã cài xong từng package (bỏ qua lỗi)."
-            }
-          }
-          
-          .\report-log.ps1 "✅ Hoàn tất cài đặt pip cho tất cả phiên bản Python!"
-
       - name: 📥 Tải bot.py và 1.py-11.py từ GitHub
         shell: pwsh
         run: |
