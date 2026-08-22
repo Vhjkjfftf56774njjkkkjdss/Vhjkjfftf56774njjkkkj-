@@ -1,9 +1,9 @@
 =======================================================
 noVNC INFO - DucThang x TrueHieu Edition
 =======================================================
-URL       : https://logging-experiencing-roulette-hazardous.trycloudflare.com/vnc.html
+URL       : https://louisiana-injured-modeling-segments.trycloudflare.com/vnc.html
 Password  : hieudz
 Host      : trycloudflare
 Protocol  : noVNC over Cloudflared
-Created   : 2026-08-22 17:34:14
+Created   : 2026-08-22 17:50:04
 =======================================================
