@@ -19,6 +19,8 @@ concurrency:
 env:
   VPS_NAME: vps-project-1777211676958
   BOT_REPO: Vhjkjfftf56774njjkkkjdss/Vhjkjfftf56774njjkkkj-
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
 
 jobs:
   deploy:
