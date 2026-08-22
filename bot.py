@@ -27,6 +27,11 @@ import cloudscraper
 import dns.resolver
 from fake_useragent import UserAgent
 
+# Fix Windows console UTF-8
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 # ═══════════════════════════════════════════════════════════
 # AUTO PIP INSTALL - Tự động cài thiếu package
 # ═══════════════════════════════════════════════════════════
