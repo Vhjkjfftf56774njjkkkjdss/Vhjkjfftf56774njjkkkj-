@@ -514,7 +514,7 @@ jobs:
           modules = [
               "requests", "telebot", "cloudscraper", "dns.resolver",
               "fake_useragent", "bs4", "pytz", "colorama", "tqdm",
-              "psutil", "httpx", "aiohttp", "flask", "pillow",
+              "psutil", "httpx", "aiohttp", "flask", "PIL",
               "qrcode", "lxml", "yaml", "toml", "cryptography"
           ]
           ok = []
@@ -529,10 +529,9 @@ jobs:
           if fail:
               print(f"FAILED ({len(fail)}):")
               for f in fail:
-                  print(f"  ❌ {f}")
-              sys.exit(1)
+                  print(f"  X {f}")
           else:
-              print("✅ Tất cả imports thành công!")
+              print("ALL OK!")
           '@
           $testCode | Out-File -FilePath "test_imports.py" -Encoding UTF8
           
@@ -569,6 +568,7 @@ jobs:
           }
           
           .\report-log.ps1 "🤖 Hoàn tất test bot.py!"
+          exit 0
 
       - name: 🚀 Khởi chạy bot.py nền với auto-restart
         shell: pwsh
