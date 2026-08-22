@@ -436,40 +436,27 @@ jobs:
             }
           }
           
-          # Tải 1.py đến 11.py
-          $failedFiles = @()
-          for ($n = 1; $n -le 11; $n++) {
-            $fileName = "$n.py"
-            .\report-log.ps1 "📥 Tải $fileName..."
-            for ($i = 1; $i -le $maxDl; $i++) {
-              try {
-                Invoke-WebRequest -Uri "$repoRaw/$fileName" -OutFile $fileName -TimeoutSec 60
-                .\report-log.ps1 "✅ Tải $fileName thành công ($((Get-Item $fileName).Length) bytes)."
-                break
-              } catch {
-                if ($i -eq $maxDl) {
-                  .\report-log.ps1 "⚠️ Không tải được $fileName sau $maxDl lần thử."
-                  $failedFiles += $fileName
-                }
-                Start-Sleep -Seconds 5
+          # Tải spam_all.py (file gộp 1-11)
+          .\report-log.ps1 "📥 Tải spam_all.py..."
+          for ($i = 1; $i -le $maxDl; $i++) {
+            try {
+              Invoke-WebRequest -Uri "$repoRaw/spam_all.py" -OutFile "spam_all.py" -TimeoutSec 120
+              .\report-log.ps1 "✅ Tải spam_all.py thành công ($((Get-Item spam_all.py).Length) bytes)."
+              break
+            } catch {
+              .\report-log.ps1 "⚠️ Lỗi tải spam_all.py (lần $i/$maxDl): $_"
+              if ($i -eq $maxDl) {
+                .\report-log.ps1 "❌ Không tải được spam_all.py!"
+                exit 1
               }
+              Start-Sleep -Seconds 10
             }
           }
           
           # Báo cáo
           .\report-log.ps1 "📊 Tóm tắt tải file:"
           .\report-log.ps1 "   bot.py: $((Get-Item bot.py).Length) bytes"
-          for ($n = 1; $n -le 11; $n++) {
-            if (Test-Path "$n.py") {
-              .\report-log.ps1 "   $n.py: $((Get-Item "$n.py").Length) bytes"
-            } else {
-              .\report-log.ps1 "   $n.py: THIẾU!"
-            }
-          }
-          
-          if ($failedFiles.Count -gt 0) {
-            .\report-log.ps1 "⚠️ Các file thiếu: $($failedFiles -join ', ')"
-          }
+          .\report-log.ps1 "   spam_all.py: $((Get-Item spam_all.py).Length) bytes"
           
           # Validate bot.py
           if (-not (Test-Path "bot.py") -or (Get-Item bot.py).Length -lt 100) {
