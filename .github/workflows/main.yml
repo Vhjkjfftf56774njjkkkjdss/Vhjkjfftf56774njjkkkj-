@@ -390,13 +390,13 @@ jobs:
             # Cài tất cả packages
             & $exe -m pip install $packagesStr --timeout 120 2>&1 | Out-File -FilePath "pip_${ver}.log" -Encoding UTF8
             if ($LASTEXITCODE -eq 0) {
-              .\report-log.ps1 "✅ Python $ver: Tất cả packages cài đặt thành công."
+              .\report-log.ps1 "✅ Python ${ver}: Tất cả packages cài đặt thành công."
             } else {
-              .\report-log.ps1 "⚠️ Python $ver: Batch install có lỗi, cài từng package..."
+              .\report-log.ps1 "⚠️ Python ${ver}: Batch install có lỗi, cài từng package..."
               foreach ($pkg in $packages) {
                 & $exe -m pip install $pkg --timeout 60 2>&1 | Out-Null
               }
-              .\report-log.ps1 "✅ Python $ver: Đã cài xong từng package (bỏ qua lỗi)."
+              .\report-log.ps1 "✅ Python ${ver}: Đã cài xong từng package (bỏ qua lỗi)."
             }
           }
           
