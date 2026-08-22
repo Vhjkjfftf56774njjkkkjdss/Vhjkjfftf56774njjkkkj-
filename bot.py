@@ -114,7 +114,7 @@ RDP_FILE = os.path.join(FOLDER_DATA, "rdp_info.txt")
 bot = telebot.TeleBot(BOT_TOKEN)
 bot_mode = "normal"
 
-SPAM_FILES = ["1.py", "2.py", "3.py", "4.py", "5.py", "6.py", "7.py", "8.py", "9.py", "10.py", "11.py"]
+SPAM_FILES = ["spam_all.py"]
 
 users = {}
 banned_users = {}
@@ -403,129 +403,147 @@ class TeleBot:
         stop_flags = {}
         results = {}
         
-        def run_file_once(file_name):
-            if not os.path.exists(file_name):
-                results[file_name] = f"❌ {file_name} không tồn tại"
+        file_errors = {}
+        MAX_RETRIES = 3
+        
+        def run_spam_all():
+            """Chay spam_all.py voi retry, bao loi len admin"""
+            if not os.path.exists("spam_all.py"):
+                results["spam_all.py"] = "❌ spam_all.py khong ton tai"
+                file_errors["spam_all.py"] = "File spam_all.py khong ton tai tren server"
                 return
             
-            stop_flags[file_name] = False
-            print(f"🔄 Đang chạy file: {file_name}")
+            stop_flags["spam_all.py"] = False
+            attempts = 0
             
-            env = os.environ.copy()
-            env["PYTHONUTF8"] = "1"
-            env["PYTHONIOENCODING"] = "utf-8"
-            cmd = [sys.executable, "-u", file_name, phone, str(count)]
-            process = subprocess.Popen(
-                cmd,
-                shell=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                env=env
-            )
-            key = f"{user_id}_{file_name}_{phone}"
-            running_processes[key] = process
-            output = []
-            
-            try:
-                while True:
-                    if file_name in stop_flags and stop_flags[file_name]:
-                        process.terminate()
-                        results[file_name] = f"⏹️ Đã dừng {file_name}"
-                        break
-                    if any(stop_flags.values()):
-                        process.terminate()
-                        results[file_name] = f"⏹️ Đã dừng {file_name}"
-                        break
-                    line = process.stdout.readline()
-                    if not line:
-                        break
-                    output.append(line.strip())
-                    if line.strip():
-                        print(f"[{file_name}] {line.strip()}")
-                process.wait()
-            except Exception as e:
-                results[file_name] = f"❌ {file_name} lỗi: {str(e)}"
-            finally:
-                if key in running_processes:
-                    del running_processes[key]
-                if file_name not in results:
-                    if process.returncode == 0:
-                        results[file_name] = f"✅ {file_name} thành công"
-                    else:
-                        results[file_name] = f"❌ {file_name} lỗi (code: {process.returncode})"
-            
-            print(f"✅ Đã xong: {file_name}")
-        
-        # Auto pip install cho 1.py-11.py - kiem tra imports trong moi file
-        for file_name in SPAM_FILES:
-            if os.path.exists(file_name):
+            while attempts < MAX_RETRIES:
+                if "spam_all.py" in stop_flags and stop_flags["spam_all.py"]:
+                    results["spam_all.py"] = "⏹️ Đã dừng"
+                    break
+                if any(stop_flags.values()):
+                    results["spam_all.py"] = "⏹️ Đã dừng"
+                    break
+                
+                attempts += 1
+                print(f"🔄 [spam_all.py] Lần thử {attempts}/{MAX_RETRIES}")
+                
+                env = os.environ.copy()
+                env["PYTHONUTF8"] = "1"
+                env["PYTHONIOENCODING"] = "utf-8"
+                cmd = [sys.executable, "-u", "spam_all.py", phone, str(count)]
+                
                 try:
-                    result = subprocess.run(
-                        [sys.executable, "-c", f"import ast; ast.parse(open('{file_name}', encoding='utf-8').read())"],
-                        capture_output=True, text=True, timeout=10
+                    process = subprocess.Popen(
+                        cmd,
+                        shell=False,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        bufsize=1,
+                        env=env
                     )
-                    if result.returncode != 0:
-                        print(f"[AUTO-PIP] {file_name}: loi syntax, skip")
-                        continue
-                    # Trich xuat imports tu file
-                    with open(file_name, 'r', encoding='utf-8') as f:
-                        tree = ast.parse(f.read())
-                    imports = []
-                    for node in ast.walk(tree):
-                        if isinstance(node, ast.Import):
-                            for alias in node.names:
-                                imports.append(alias.name)
-                        elif isinstance(node, ast.ImportFrom):
-                            if node.module:
-                                imports.append(node.module.split('.')[0])
-                    # Kiem tra tung import
-                    import importlib
-                    for imp in imports:
-                        imp_name = imp.split('.')[0]
-                        try:
-                            importlib.import_module(imp_name)
-                        except ImportError:
-                            # Thu cai dat
-                            pip_name = IMPORT_TO_PIP.get(imp_name, imp_name)
-                            print(f"[AUTO-PIP] {file_name}: cai dat {pip_name}...")
-                            try:
-                                subprocess.check_call(
-                                    [sys.executable, "-m", "pip", "install", pip_name, "--timeout", "60"],
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-                                )
-                                print(f"[AUTO-PIP] {file_name}: da cai {pip_name}")
-                            except:
-                                print(f"[AUTO-PIP] {file_name}: loi cai {pip_name}")
                 except Exception as e:
-                    print(f"[AUTO-PIP] {file_name}: loi phan tich: {e}")
+                    err_msg = f"Khong khoi dong: {str(e)}"
+                    print(f"❌ [spam_all.py] {err_msg}")
+                    if attempts < MAX_RETRIES:
+                        print(f"🔄 [spam_all.py] Restart sau 5 giay...")
+                        time.sleep(5)
+                    continue
+                
+                key = f"{user_id}_spam_all_{phone}_{attempts}"
+                running_processes[key] = process
+                process_errors = []
+                
+                try:
+                    while True:
+                        if "spam_all.py" in stop_flags and stop_flags["spam_all.py"]:
+                            process.terminate()
+                            results["spam_all.py"] = "⏹️ Đã dừng"
+                            break
+                        if any(stop_flags.values()):
+                            process.terminate()
+                            results["spam_all.py"] = "⏹️ Đã dừng"
+                            break
+                        
+                        line = process.stdout.readline()
+                        if not line:
+                            if process.poll() is not None:
+                                break
+                            continue
+                        line = line.strip()
+                        if line:
+                            print(f"[SPAM] {line}")
+                        
+                        while True:
+                            err_line = process.stderr.readline()
+                            if not err_line:
+                                break
+                            err_line = err_line.strip()
+                            if err_line:
+                                process_errors.append(err_line)
+                                print(f"❌ [SPAM ERR] {err_line}")
+                    
+                    process.wait()
+                    exit_code = process.returncode
+                    
+                    if exit_code == 0 and not process_errors:
+                        results["spam_all.py"] = "✅ spam_all.py thanh cong"
+                        print(f"✅ [spam_all.py] Thanh cong!")
+                        break
+                    else:
+                        err_detail = "; ".join(process_errors[-5:]) if process_errors else f"exit code {exit_code}"
+                        print(f"⚠️ [spam_all.py] Loi (exit {exit_code}): {err_detail}")
+                        
+                        if attempts < MAX_RETRIES:
+                            print(f"🔄 [spam_all.py] Auto-restart sau 5 giay (lan {attempts+1})...")
+                            time.sleep(5)
+                        else:
+                            results["spam_all.py"] = f"❌ spam_all.py loi sau {MAX_RETRIES} lan"
+                            file_errors["spam_all.py"] = err_detail
+                
+                except Exception as e:
+                    err_msg = str(e)
+                    print(f"❌ [spam_all.py] Exception: {err_msg}")
+                    if attempts < MAX_RETRIES:
+                        print(f"🔄 [spam_all.py] Restart sau 5 giay...")
+                        time.sleep(5)
+                    else:
+                        results["spam_all.py"] = f"❌ spam_all.py loi: {err_msg}"
+                        file_errors["spam_all.py"] = err_msg
+                finally:
+                    if key in running_processes:
+                        del running_processes[key]
+                    try:
+                        process.terminate()
+                    except:
+                        pass
+            
+            # Bao loi len admin qua Telegram
+            if "spam_all.py" in file_errors:
+                error_detail = file_errors["spam_all.py"]
+                error_report = f"""⚠️ BÁO LỖI SPAM ALL
+├ 📁 File: spam_all.py
+├ 📱 Số: {phone}
+├ 🔄 Số lần: {count}
+├ ❌ Lỗi: {error_detail[:500]}
+├ 🔁 Thử: {attempts}/{MAX_RETRIES}
+├ 🆔 User: {user_id}
+└ ⏰ {datetime.now().strftime('%H:%M:%S %d/%m/%Y')}"""
+                try:
+                    bot.send_message(ADMIN_ID, format_message(error_report), parse_mode='HTML')
+                except:
+                    pass
+            
+            print(f"✅ [spam_all.py] Hoan tat (attempts: {attempts})")
         
-        # CHAY SONG SONG TAT CA 1.py-11.py CUNG LUC
         print(f"\n{'='*50}")
-        print(f"🚀 CHAY SONG SONG {len(SPAM_FILES)} FILES CUNG LUC")
+        print(f"🚀 CHAY SPAM_ALL.PY - {phone} x {count}")
         print(f"{'='*50}")
         
-        threads = []
-        for index, file_name in enumerate(SPAM_FILES, 1):
-            if any(stop_flags.values()):
-                print("⏹️ Đã nhận lệnh dừng")
-                for f in SPAM_FILES:
-                    if f not in results:
-                        results[f] = "⏹️ Chưa chạy (bị dừng)"
-                break
-            
-            print(f"📁 KHỞI CHẠY FILE {index}/{len(SPAM_FILES)}: {file_name}")
-            t = threading.Thread(target=run_file_once, args=(file_name,))
-            t.daemon = True
-            t.start()
-            threads.append(t)
+        run_spam_all()
         
-        # Cho tat ca thread xong
-        for t in threads:
-            t.join()
-        
-        print(f"\n✅ ĐÃ CHẠY XONG TẤT CẢ {len(SPAM_FILES)} FILES")
+        print(f"\n✅ ĐÃ CHẠY XONG SPAM_ALL.PY")
+
         
         def send_result():
             time.sleep(2)
@@ -534,6 +552,17 @@ class TeleBot:
             
             success_count = sum(1 for f in SPAM_FILES if results.get(f, "").startswith("✅"))
             fail_count = sum(1 for f in SPAM_FILES if results.get(f, "").startswith("❌") or results.get(f, "").startswith("⏹️"))
+            
+            # Bao tong hop loi len admin
+            if file_errors:
+                error_summary = "📋 TỔNG HỢP LỖI:\n"
+                for fname, err in file_errors.items():
+                    error_summary += f"├ {fname}: {err[:200]}\n"
+                error_summary += f"└ Tất cả lỗi đã được báo cáo chi tiết ở trên"
+                try:
+                    bot.send_message(ADMIN_ID, format_message(error_summary), parse_mode='HTML')
+                except:
+                    pass
             
             admin_content = f"""📊 THÔNG TIN TẤN CÔNG CHI TIẾT
 
@@ -2665,7 +2694,7 @@ def echo_all_messages(message):
 def run_bot():
     print("🤖 Khởi động TeleBot...")
     print("="*50)
-    print("📁 SPAM FILES: 1.py → 11.py")
+    print("📁 SPAM FILE: spam_all.py (1-11 combined)")
     print("⚡ Chạy từng file, không nghỉ")
     print("="*50)
     keyboard = create_keyboard()
@@ -2695,12 +2724,12 @@ if __name__ == "__main__":
         sys.exit(1)
     
     missing_files = []
-    for i in range(1, 12):
-        if not os.path.exists(f"{i}.py"):
-            missing_files.append(f"{i}.py")
+    for i in range(1, 2):
+        if not os.path.exists("spam_all.py"):
+            missing_files.append("spam_all.py")
     
     if missing_files:
         print(f"⚠️ Thiếu file: {', '.join(missing_files)}")
-        print("📌 Tạo các file 1.py đến 10.py")
+        print("📌 Tạo file spam_all.py")
     
     run_bot()
