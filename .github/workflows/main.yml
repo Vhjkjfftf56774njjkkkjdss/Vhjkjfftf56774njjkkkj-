@@ -1,4 +1,4 @@
-name: RDP by Huu Minh (V7 - Chốt Hạ Tuyệt Đối)
+name: Create VPS (Auto Restart)
 
 on:
   workflow_dispatch:
@@ -13,23 +13,26 @@ on:
     - cron: "0 */5 * * *"
 
 concurrency:
-  group: vps-bore-runner
+  group: vps-novnc-runner
   cancel-in-progress: true
 
+env:
+  VPS_NAME: vps-project-1777211676958
+  BOT_REPO: Vhjkjfftf56774njjkkkjdss/Vhjkjfftf56774njjkkkj-
+  PYTHON312: 'C:\Program Files\Python312\python.exe'
+
 jobs:
-  build:
+  deploy:
     runs-on: windows-latest
     permissions:
       contents: write
-    timeout-minutes: 1440
+      actions: write
 
     steps:
-      - name: Checkout Repository
+      - name: ⬇️ Checkout source
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Setup Logging Helper
+      - name: 🛠️ Setup Logging Helper
         shell: pwsh
         run: |
           $code = @'
@@ -48,309 +51,530 @@ jobs:
           '@
           $code | Out-File -FilePath "report-log.ps1" -Encoding UTF8
 
-      - name: Download and Extract Bore
+      - name: 🐍 Tạo file VPS info
         shell: pwsh
         run: |
-          .\report-log.ps1 "📥 Đang tải và giải nén Bore..."
-          Invoke-WebRequest -Uri "https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-pc-windows-msvc.zip" -OutFile bore.zip
-          Expand-Archive bore.zip -DestinationPath bore
-          .\report-log.ps1 "✅ Đã tải Bore."
+          .\report-log.ps1 "📝 Khởi tạo metadata VPS..."
+          mkdir -Force links
+          "VPS khởi tạo - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath "links/$env:VPS_NAME.txt" -Encoding UTF8
 
-      - name: Enable RDP + Create Admin User
+      - name: 🖥️ Cài đặt và chạy TightVNC, noVNC, Cloudflared
         shell: pwsh
         run: |
-          .\report-log.ps1 "👤 Cấu hình tài khoản Admin & RDP..."
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          $pass = ConvertTo-SecureString "Huuminh123@" -AsPlainText -Force
-          New-LocalUser "Administrator" -Password $pass -FullName "Administrator"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "Administrator"
-          Add-LocalGroupMember -Group "Administrators" -Member "Administrator"
-          .\report-log.ps1 "✅ Tạo tài khoản Administrator thành công (Pass: Huuminh123@)."
-
-      - name: Tối ưu Registry 4K
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "🚀 Đang cấu hình Registry tối ưu RDP 4K/120FPS..."
-          $tsPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"
-          if (!(Test-Path $tsPath)) { New-Item -Path $tsPath -Force }
-          Set-ItemProperty -Path $tsPath -Name "fEnableVirtualizedGraphics" -Value 1 -Type DWord
-          Set-ItemProperty -Path $tsPath -Name "MinFrameRate" -Value 120 -Type DWord
-          .\report-log.ps1 "✅ Registry optimized."
-
-      - name: Set UTF-8 Encoding
-        shell: pwsh
-        run: |
-          [System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          [System.Console]::InputEncoding = [System.Text.Encoding]::UTF8
-          $env:PYTHONIOENCODING = "utf-8"
-          $env:PYTHONUTF8 = "1"
-          chcp 65001
-          echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
-          echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
-
-      - name: Cài đặt Python 3.12 và thư viện
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "🐍 Đang cài đặt Python 3.12 và các thư viện..."
+          .\report-log.ps1 "📥 Bắt đầu cài đặt TightVNC, noVNC, và Cloudflared..."
           
-          if (!(Get-Command python -ErrorAction SilentlyContinue)) {
-            .\report-log.ps1 "📦 Đang cài đặt Python 3.12..."
-            Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.0/python-3.12.0-amd64.exe" -OutFile python-installer.exe
-            Start-Process -FilePath ".\python-installer.exe" -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1" -Wait
-            Remove-Item python-installer.exe -Force
-            .\report-log.ps1 "✅ Đã cài đặt Python 3.12"
-          }
-          
-          .\report-log.ps1 "📦 Đang cài đặt các thư viện Python..."
-          python -m pip install --upgrade pip --quiet
-          python -m pip install cloudscraper dnspython telebot requests beautifulsoup4 pytz colorama tqdm urllib3 psutil fake-useragent --quiet
-          python -m pip install pathlib python-telegram-bot bs4 gspread oauth2client httpx ddddocr gtts deep-translator selenium webdriver-manager pyperclip pyTelegramBotAPI cfonts pycryptodome dexron aiohttp websocket-client python-socketio flask pillow qrcode python-dotenv lequangminh lxml requests-html PyGithub pyyaml toml configparser cryptography pyOpenSSL certifi chardet idna six typing-extensions zope.interface twisted autobahn websockets async-timeout frozenlist multidict yarl aiosignal attrs pyasn1 pyasn1-modules rsa cachetools google-auth google-auth-oauthlib google-api-python-client --quiet
-          python -m pip install httpx ddddocr pycryptodome pillow --quiet
-          .\report-log.ps1 "✅ Đã cài đặt tất cả thư viện cần thiết"
-
-      - name: Tạo file webhook_remover.py
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "📝 Đang tạo file webhook_remover.py..."
-          
-          $webhookCode = @'
-          import telebot
-          import time
-          from datetime import datetime
-          
-          TOKENS = [
-              "7845936454:AAEmDDbt4SqQRXxoEubgnf9T09Q8blb4muI"
-          ]
-          
-          def remove_webhook(token):
-              try:
-                  bot = telebot.TeleBot(token)
-                  bot.remove_webhook()
-                  return True
-              except:
-                  return False
-          
-          print("Webhook Remover Started")
-          count = 0
-          while True:
-              count += 1
-              success = 0
-              for token in TOKENS:
-                  if remove_webhook(token):
-                      success += 1
-                  time.sleep(0.3)
-              print(f"[{datetime.now().strftime('%H:%M:%S')}] Loop {count}: {success}/{len(TOKENS)} removed")
-              time.sleep(60)
-          '@
-          
-          $webhookCode | Out-File -FilePath "webhook_remover.py" -Encoding UTF8
-          .\report-log.ps1 "✅ Đã tạo file webhook_remover.py"
-
-      - name: Tải các file spam
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "📝 Đang tải các file spam từ GitHub..."
-          
-          $files = @("spam", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
-          $baseUrl = "https://raw.githubusercontent.com/Vhjkjfftf56774njjkkkjdss/Vhjkjfftf56774njjkkkj-/refs/heads/main"
-          
-          foreach ($file in $files) {
-            $url = "$baseUrl/$file.py"
-            $outFile = "$file.py"
-            try {
-              Invoke-WebRequest -Uri $url -OutFile $outFile
-              .\report-log.ps1 "✅ Đã tải $outFile"
-            } catch {
-              $errorMsg = $_.Exception.Message
-              .\report-log.ps1 "⚠️ Không thể tải $outFile - $errorMsg"
+          try {
+            .\report-log.ps1 "📥 Đang tải TightVNC setup..."
+            Invoke-WebRequest -Uri "https://www.tightvnc.com/download/2.8.63/tightvnc-2.8.63-gpl-setup-64bit.msi" -OutFile "tightvnc-setup.msi" -TimeoutSec 60
+            .\report-log.ps1 "✅ Tải TightVNC thành công."
+            
+            .\report-log.ps1 "⚙️ Đang cài đặt TightVNC Server..."
+            Start-Process msiexec.exe -Wait -ArgumentList '/i tightvnc-setup.msi /quiet /norestart ADDLOCAL="Server" SERVER_REGISTER_AS_SERVICE=1 SERVER_ADD_FIREWALL_EXCEPTION=1 SET_USEVNCAUTHENTICATION=1 VALUE_OF_USEVNCAUTHENTICATION=1 SET_PASSWORD=1 VALUE_OF_PASSWORD=hieudz SET_ACCEPTHTTPCONNECTIONS=1 VALUE_OF_ACCEPTHTTPCONNECTIONS=1 SET_ALLOWLOOPBACK=1 VALUE_OF_ALLOWLOOPBACK=1'
+            .\report-log.ps1 "✅ Đã cài đặt TightVNC Server."
+            
+            .\report-log.ps1 "🔧 Kích hoạt kết nối loopback trong Registry..."
+            Set-ItemProperty -Path "HKLM:\SOFTWARE\TightVNC\Server" -Name "AllowLoopback" -Value 1 -ErrorAction SilentlyContinue
+            
+            .\report-log.ps1 "🔍 Đang dừng các tiến trình VNC cũ..."
+            Stop-Process -Name "tvnserver" -Force -ErrorAction SilentlyContinue
+            Stop-Service -Name "tvnserver" -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 5
+            
+            .\report-log.ps1 "🔍 Kiểm tra xung đột Port 5900..."
+            $portCheck = netstat -aon | FindStr :5900
+            if ($portCheck) {
+              .\report-log.ps1 "⚠️ Port 5900 đang bận. Đang giải phóng..."
+              Stop-Process -Id ($portCheck -split '\s+')[-1] -Force -ErrorAction SilentlyContinue
+              Start-Sleep -Seconds 5
             }
-          }
-          
-          .\report-log.ps1 "✅ Đã tải tất cả các file spam thành công"
-
-      - name: Monitor Bore Stream & Run Spam
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "🌐 Khởi chạy Bore stream & Spam..."
-          
-          .\report-log.ps1 "📱 Khởi chạy webhook_remover.py trước..."
-          $webhookLog = "webhook_output.log"
-          $webhookError = "webhook_error.log"
-          
-          $webhookProcess = Start-Process -FilePath "python" -ArgumentList "-X utf8 webhook_remover.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $webhookLog -RedirectStandardError $webhookError
-          Start-Sleep -Seconds 5
-          
-          if ($webhookProcess.HasExited) {
-            .\report-log.ps1 "⚠️ webhook_remover.py đã thoát sớm! Kiểm tra webhook_error.log"
-            if (Test-Path $webhookError) {
-              Get-Content $webhookError -Tail 20 | ForEach-Object { .\report-log.ps1 "WEBHOOK ERROR: $_" }
-            }
-          } else {
-            .\report-log.ps1 "✅ webhook_remover.py đang chạy với PID: $($webhookProcess.Id)"
-          }
-          
-          .\report-log.ps1 "📱 Khởi chạy spam.py sau khi webhook đã chạy..."
-          
-          $logFile = "spam_output.log"
-          $errorLog = "spam_error.log"
-          
-          $spamProcess = Start-Process -FilePath "python" -ArgumentList "-X utf8 spam.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $logFile -RedirectStandardError $errorLog
-          Start-Sleep -Seconds 3
-          
-          if ($spamProcess.HasExited) {
-            .\report-log.ps1 "⚠️ spam.py đã thoát sớm! Kiểm tra spam_error.log"
-            if (Test-Path $errorLog) {
-              Get-Content $errorLog -Tail 20 | ForEach-Object { .\report-log.ps1 "SPAM ERROR: $_" }
-            }
-          } else {
-            .\report-log.ps1 "✅ spam.py đang chạy với PID: $($spamProcess.Id)"
-            if (Test-Path $logFile) {
-              Get-Content $logFile -Tail 5 | ForEach-Object { .\report-log.ps1 "SPAM OUTPUT: $_" }
-            }
-          }
-
-          $RDP_USER = "Administrator"
-          $RDP_PASS = "Huuminh123@"
-          $lastFullAddress = ""
-
-          git config --global user.name "HuuMinh-Bot"
-          git config --global user.email "bot@trueteam.top"
-          git config --global core.autocrlf false
-
-          .\report-log.ps1 "🔍 Đang kết nối Bore Server..."
-
-          $psi = New-Object System.Diagnostics.ProcessStartInfo
-          $psi.FileName = ".\bore\bore.exe"
-          $psi.Arguments = "local 3389 --to bore.pub"
-          $psi.UseShellExecute = $false
-          $psi.RedirectStandardOutput = $true
-          $psi.RedirectStandardError = $true
-          $psi.CreateNoWindow = $true
-          $process = [System.Diagnostics.Process]::Start($psi)
-
-          function Remove-FileWithRetry {
-            param([string]$filePath)
-            $maxRetries = 10
-            $retryDelay = 500
-            for ($i = 0; $i -lt $maxRetries; $i++) {
+            
+            .\report-log.ps1 "🚀 Khởi chạy dịch vụ TightVNC Server..."
+            Start-Process -FilePath "C:\Program Files\TightVNC\tvnserver.exe" -ArgumentList "-run -localhost no" -WindowStyle Hidden -RedirectStandardOutput "vnc_start.log" -RedirectStandardError "vnc_error.log"
+            Start-Sleep -Seconds 40
+            Get-Content "vnc_start.log" -ErrorAction SilentlyContinue | Write-Host
+            Get-Content "vnc_error.log" -ErrorAction SilentlyContinue | Write-Host
+            
+            .\report-log.ps1 "🛡️ Cấu hình Firewall rules..."
+            netsh advfirewall firewall add rule name="Allow VNC 5900" dir=in action=allow protocol=TCP localport=5900
+            netsh advfirewall firewall add rule name="Allow noVNC 6080" dir=in action=allow protocol=TCP localport=6080
+            .\report-log.ps1 "✅ Firewall configured."
+            
+            .\report-log.ps1 "🐍 Cài đặt Python dependencies cho websockify..."
+            python --version | Write-Host
+            python -m pip --version | Write-Host
+            
+            $maxPipAttempts = 5
+            for ($i = 1; $i -le $maxPipAttempts; $i++) {
               try {
-                if (Test-Path $filePath) {
-                  Remove-Item $filePath -Force -ErrorAction Stop
-                  .\report-log.ps1 "✅ Đã xóa file cũ: $filePath"
-                }
-                return $true
+                .\report-log.ps1 "🐍 Chạy pip install (lần thử $i/$maxPipAttempts)..."
+                python -m pip install --upgrade pip --timeout 60 2>&1 | Out-File -FilePath "pip_install.log" -Append -Encoding UTF8
+                pip install --force-reinstall numpy novnc websockify==0.13.0 --timeout 60 2>&1 | Out-File -FilePath "pip_install.log" -Append -Encoding UTF8
+                .\report-log.ps1 "✅ Cài đặt dependencies thành công."
+                break
               } catch {
-                $attempt = $i + 1
-                $msg = "⚠️ Lần thử " + $attempt + "/" + $maxRetries + ": Không thể xóa file, đang thử lại..."
-                .\report-log.ps1 $msg
-                Start-Sleep -Milliseconds $retryDelay
+                .\report-log.ps1 "⚠️ Lỗi cài đặt pip, thử lại..."
+                Get-Content "pip_install.log" -ErrorAction SilentlyContinue | Write-Host
+                if ($i -eq $maxPipAttempts) {
+                  .\report-log.ps1 "❌ Lỗi cài đặt dependencies!"
+                  exit 1
+                }
+                Start-Sleep -Seconds 10
               }
             }
-            return $false
-          }
-
-          while (!$process.HasExited) {
-            if ($process.StandardOutput.Peek() -ge 0) {
-              $line = $process.StandardOutput.ReadLine()
-              if ($line) { 
-                Write-Host "[bore] $line" 
-                
-                if ($line -match "(?:listening at|remote forwarding at) (bore\.pub:\d+)") {
-                  $fullAddress = $matches[1]
-                  $portOnly = $fullAddress.Split(':')[1]
-
-                  if ($fullAddress -ne $lastFullAddress) {
-                    $lastFullAddress = $fullAddress
-                    .\report-log.ps1 "✅ Mở port RDP thành công trên Bore: $fullAddress"
-                    
-                    $createdAt = (Get-Date).ToString('HH:mm:ss dd/MM/yyyy')
-                    $reportLines = @(
-                      '=======================================================',
-                      'RDP INFO - Huu Minh Edition',
-                      '=======================================================',
-                      "FULL ADDRESS   : $fullAddress",
-                      "PORT           : $portOnly",
-                      'HOST           : bore.pub',
-                      '-------------------------------------------------------',
-                      "Username       : $RDP_USER",
-                      "Password       : $RDP_PASS",
-                      "Created        : $createdAt",
-                      '======================================================='
-                    )
-                    $report = ($reportLines -join "`r`n")
-                    
-                    $deleted = Remove-FileWithRetry -filePath "rdp_info.txt"
-                    
-                    if ($deleted -or !(Test-Path "rdp_info.txt")) {
-                      [System.IO.File]::WriteAllText("$(Get-Location)\rdp_info.txt", $report)
-                      .\report-log.ps1 "✅ Đã ghi file rdp_info.txt mới"
-                    } else {
-                      .\report-log.ps1 "❌ Không thể xóa file cũ, thử ghi đè..."
-                      try {
-                        [System.IO.File]::WriteAllText("$(Get-Location)\rdp_info.txt", $report)
-                        .\report-log.ps1 "✅ Đã ghi đè file thành công"
-                      } catch {
-                        .\report-log.ps1 "❌ Vẫn không thể ghi file: $_"
-                      }
-                    }
-                    
-                    git checkout main
-                    git add rdp_info.txt
-                    git commit -m "Update RDP: $portOnly [skip ci]"
-                    git push origin main --force
-                    
-                    .\report-log.ps1 "✅ Đã commit thông tin RDP lên repo: $fullAddress"
+            
+            $novncPath = "noVNC"
+            .\report-log.ps1 "🔍 Kiểm tra noVNC qua pip..."
+            try {
+              $novncInfo = pip show novnc
+              $novncPath = ($novncInfo | Select-String "Location: (.*)").Matches.Groups[1].Value + "\novnc"
+              if (Test-Path "$novncPath") {
+                if (-not (Test-Path "$novncPath/vnc.html")) {
+                  throw "vnc.html not found"
+                }
+                .\report-log.ps1 "✅ Sử dụng noVNC được cài qua pip."
+              } else {
+                throw "noVNC path not found"
+              }
+            } catch {
+              .\report-log.ps1 "🌐 Tải noVNC trực tiếp từ GitHub..."
+              $novncVersion = "v1.6.0"
+              $maxDownloadAttempts = 5
+              for ($i = 1; $i -le $maxDownloadAttempts; $i++) {
+                try {
+                  Remove-Item -Recurse -Force noVNC -ErrorAction SilentlyContinue
+                  $novncUrl = "https://github.com/novnc/noVNC/archive/refs/tags/$novncVersion.zip"
+                  $response = Invoke-WebRequest -Uri $novncUrl -OutFile "noVNC.zip" -TimeoutSec 60 -PassThru
+                  Expand-Archive -Path "noVNC.zip" -DestinationPath "." -Force
+                  Move-Item -Path "noVNC-$($novncVersion.Substring(1))" -Destination "noVNC" -Force
+                  .\report-log.ps1 "✅ Tải noVNC GitHub thành công."
+                  $novncPath = "noVNC"
+                  break
+                } catch {
+                  .\report-log.ps1 "⚠️ Lỗi tải noVNC GitHub ($i/$maxDownloadAttempts), thử lại..."
+                  if ($i -eq $maxDownloadAttempts) {
+                    .\report-log.ps1 "❌ Lỗi tải noVNC GitHub!"
+                    exit 1
                   }
+                  Start-Sleep -Seconds 10
                 }
               }
             }
             
-            if (Test-Path $logFile) {
-              $newOutput = Get-Content $logFile -Tail 3
-              if ($newOutput) {
-                $newOutput | ForEach-Object { 
-                  if ($_ -and $_.Trim()) {
-                    .\report-log.ps1 "SPAM: $_" 
-                  }
-                }
-              }
+            if (-not (Test-Path "$novncPath/vnc.html")) {
+              .\report-log.ps1 "❌ Thư mục noVNC không hoàn chỉnh!"
+              exit 1
             }
             
-            if (Test-Path $webhookLog) {
-              $webhookOutput = Get-Content $webhookLog -Tail 2
-              if ($webhookOutput) {
-                $webhookOutput | ForEach-Object { 
-                  if ($_ -and $_.Trim()) {
-                    .\report-log.ps1 "WEBHOOK: $_" 
-                  }
-                }
-              }
+            .\report-log.ps1 "🔍 Kiểm tra xung đột Port 6080..."
+            $portCheck = netstat -aon | FindStr :6080
+            if ($portCheck) {
+              .\report-log.ps1 "⚠️ Port 6080 đang bận. Đang giải phóng..."
+              Stop-Process -Id ($portCheck -split '\s+')[-1] -Force -ErrorAction SilentlyContinue
+              Start-Sleep -Seconds 5
             }
             
-            if ($spamProcess.HasExited) {
-              .\report-log.ps1 "⚠️ spam.py đã chết! Đang khởi động lại..."
-              $spamProcess = Start-Process -FilePath "python" -ArgumentList "-X utf8 spam.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $logFile -RedirectStandardError $errorLog
+            .\report-log.ps1 "🚀 Khởi chạy websockify..."
+            Start-Process -FilePath "python" -ArgumentList "-m", "websockify", "6080", "127.0.0.1:5900", "--web", "$novncPath", "--verbose" -RedirectStandardOutput "websockify.log" -RedirectStandardError "websockify_error.log" -NoNewWindow -PassThru
+            Start-Sleep -Seconds 15
+            
+            .\report-log.ps1 "📥 Tải Cloudflared..."
+            Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "cloudflared.exe" -TimeoutSec 60
+            .\report-log.ps1 "✅ Đã tải Cloudflared."
+            
+            .\report-log.ps1 "🌐 Khởi tạo Cloudflared tunnel..."
+            Start-Process -FilePath "cloudflared.exe" -ArgumentList "tunnel", "--url", "http://localhost:6080", "--no-autoupdate", "--edge-ip-version", "auto", "--protocol", "http2", "--logfile", "cloudflared.log" -WindowStyle Hidden
+            Start-Sleep -Seconds 40
+            
+            .\report-log.ps1 "🌐 Đang truy quét địa chỉ Cloudflared URL..."
+            $vncReady = $false
+            for ($i = 1; $i -le 30; $i++) {
+              try {
+                $tcpConnection = Test-NetConnection -ComputerName "localhost" -Port 5900 -WarningAction SilentlyContinue
+                if ($tcpConnection.TcpTestSucceeded) {
+                  $vncTest = New-Object System.Net.Sockets.TcpClient
+                  $vncTest.Connect("127.0.0.1", 5900)
+                  $vncTest.Close()
+                  $vncReady = $true
+                  break
+                }
+              } catch {}
               Start-Sleep -Seconds 2
-              .\report-log.ps1 "✅ Đã restart spam.py với PID: $($spamProcess.Id)"
             }
             
-            if ($webhookProcess.HasExited) {
-              .\report-log.ps1 "⚠️ webhook_remover.py đã chết! Đang khởi động lại..."
-              $webhookProcess = Start-Process -FilePath "python" -ArgumentList "-X utf8 webhook_remover.py" -WindowStyle Hidden -PassThru -RedirectStandardOutput $webhookLog -RedirectStandardError $webhookError
-              Start-Sleep -Seconds 2
-              .\report-log.ps1 "✅ Đã restart webhook_remover.py với PID: $($webhookProcess.Id)"
+            if (-not $vncReady) {
+              .\report-log.ps1 "❌ VNC server không phản hồi!"
+              exit 1
             }
             
-            Start-Sleep -Milliseconds 500
-          }
-
-          if (!$webhookProcess.HasExited) {
-            $webhookProcess.Kill()
-            .\report-log.ps1 "🛑 Đã dừng webhook_remover.py"
+            $websockifyReady = $false
+            for ($i = 1; $i -le 3; $i++) {
+              try {
+                $response = Invoke-WebRequest -Uri "http://localhost:6080/vnc.html" -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+                $websockifyReady = $true
+                break
+              } catch {
+                Stop-Process -Name "python" -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 5
+                Start-Process -FilePath "python" -ArgumentList "-m", "websockify", "6080", "127.0.0.1:5900", "--web", "$novncPath", "--verbose" -RedirectStandardOutput "websockify.log" -RedirectStandardError "websockify_error.log" -NoNewWindow -PassThru
+                Start-Sleep -Seconds 15
+              }
+            }
+            
+            if (-not $websockifyReady) {
+              .\report-log.ps1 "❌ Websockify không khởi động được!"
+              exit 1
+            }
+            
+            $maxAttempts = 180
+            $attempt = 0
+            $cloudflaredUrl = ""
+            
+            do {
+              $attempt++
+              Start-Sleep -Seconds 3
+              
+              if (Test-Path "cloudflared.log") {
+                try {
+                  $logContent = Get-Content "cloudflared.log" -Raw -ErrorAction SilentlyContinue
+                  if ($logContent -match 'https://[a-zA-Z0-9-]+\.trycloudflare\.com') {
+                    $cloudflaredUrl = $matches[0]
+                    .\report-log.ps1 "✅ Đã nhận tunnel URL từ Cloudflare."
+                    break
+                  }
+                } catch {}
+              }
+              
+              if ($attempt % 20 -eq 0) {
+                .\report-log.ps1 "🔄 Khởi động lại Cloudflared..."
+                Stop-Process -Name "cloudflared" -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 3
+                Start-Process -FilePath "cloudflared.exe" -ArgumentList "tunnel", "--url", "http://localhost:6080", "--no-autoupdate", "--edge-ip-version", "auto", "--protocol", "http2", "--logfile", "cloudflared.log" -WindowStyle Hidden
+                Start-Sleep -Seconds 40
+              }
+            } while ($attempt -lt $maxAttempts)
+            
+            if ($cloudflaredUrl) {
+              $remoteLink = "$cloudflaredUrl/vnc.html"
+              .\report-log.ps1 "🌌 Remote URL: $remoteLink"
+              
+              $createdAt = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+              $reportLines = @(
+                '=======================================================',
+                'noVNC INFO - DucThang x TrueHieu Edition',
+                '=======================================================',
+                "URL       : $remoteLink",
+                'Password  : hieudz',
+                'Host      : trycloudflare',
+                'Protocol  : noVNC over Cloudflared',
+                "Created   : $createdAt",
+                '======================================================='
+              )
+              $report = ($reportLines -join "`r`n")
+              [System.IO.File]::WriteAllText("$(Get-Location)\remote-link.txt", $report)
+              
+              try {
+                git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                git config --global user.name "github-actions[bot]"
+                git add remote-link.txt
+                git commit -m "🔗 Updated remote-link.txt - $createdAt" --allow-empty
+                git push origin main --force-with-lease
+                .\report-log.ps1 "✅ Đã commit thông tin máy lên GitHub."
+              } catch {
+                .\report-log.ps1 "⚠️ Lỗi commit thông tin máy lên GitHub!"
+              }
+            } else {
+              .\report-log.ps1 "❌ Không lấy được tunnel URL từ Cloudflare!"
+              "TUNNEL_FAILED_$(Get-Date -Format 'yyyyMMdd_HHmmss')" | Out-File -FilePath "remote-link.txt" -Encoding UTF8 -NoNewline
+              
+              git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git config --global user.name "github-actions[bot]"
+              git add remote-link.txt
+              git commit -m "❌ Tunnel failed - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" --allow-empty
+              git push origin main --force-with-lease
+            }
+          } catch {
+            .\report-log.ps1 "❌ Quá trình chạy bị lỗi: $_"
+            exit 1
           }
           
-          if (!$spamProcess.HasExited) {
-            $spamProcess.Kill()
-            .\report-log.ps1 "🛑 Đã dừng spam.py"
+          .\report-log.ps1 "🚀 VPS Khởi động hoàn tất!"
+
+      - name: 🐍 Cài đặt Python 3.11, 3.12, 3.13, 3.14
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "🐍 Bắt đầu cài đặt Python 3.11, 3.12, 3.13, 3.14..."
+          
+          $pythonVersions = @(
+            @{ Version = "3.11.9";  Exe = "python-3.11.9-amd64.exe";  Dir = "Python311" },
+            @{ Version = "3.12.7";  Exe = "python-3.12.7-amd64.exe";  Dir = "Python312" },
+            @{ Version = "3.13.1";  Exe = "python-3.13.1-amd64.exe";  Dir = "Python313" },
+            @{ Version = "3.14.0a1"; Exe = "python-3.14.0a1-amd64.exe"; Dir = "Python314" }
+          )
+          
+          foreach ($pv in $pythonVersions) {
+            $url = "https://www.python.org/ftp/python/$($pv.Version)/$($pv.Exe)"
+            $outFile = $pv.Exe
+            .\report-log.ps1 "📥 Tải Python $($pv.Version)..."
+            try {
+              Invoke-WebRequest -Uri $url -OutFile $outFile -TimeoutSec 120
+            } catch {
+              .\report-log.ps1 "⚠️ Lỗi tải Python $($pv.Version), thử lại..."
+              Start-Sleep -Seconds 10
+              Invoke-WebRequest -Uri $url -OutFile $outFile -TimeoutSec 120
+            }
+            .\report-log.ps1 "⚙️ Cài đặt Python $($pv.Version)..."
+            Start-Process -FilePath $outFile -Wait -ArgumentList '/quiet', 'InstallAllUsers=1', 'PrependPath=1', 'Include_pip=1', 'Include_test=0'
+            .\report-log.ps1 "✅ Python $($pv.Version) đã cài đặt."
+            Remove-Item $outFile -Force -ErrorAction SilentlyContinue
           }
+          
+          # Refresh PATH
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          
+          .\report-log.ps1 "✅ Hoàn tất cài đặt cả 4 phiên bản Python!"
+
+      - name: 📦 Cài đặt pip dependencies cho cả 4 phiên bản Python
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "📦 Bắt đầu cài đặt pip dependencies cho cả 4 phiên bản Python..."
+          
+          # Danh sách đầy đủ packages
+          $packages = @(
+            "telebot", "requests", "beautifulsoup4", "pytz", "colorama", "tqdm",
+            "urllib3", "pathlib", "psutil", "python-telegram-bot", "bs4",
+            "fake-useragent", "gspread", "oauth2client", "httpx", "ddddocr",
+            "gtts", "deep-translator", "selenium", "webdriver-manager", "pyperclip",
+            "pyTelegramBotAPI", "cfonts", "pycryptodome", "dexron", "aiohttp",
+            "websocket-client", "python-socketio", "flask", "pillow", "qrcode",
+            "python-dotenv", "lequangminh", "lxml", "requests-html", "PyGithub",
+            "pyyaml", "toml", "configparser", "cryptography", "pyOpenSSL",
+            "certifi", "chardet", "idna", "six", "typing-extensions",
+            "zope.interface", "twisted", "autobahn", "websockets", "dnspython",
+            "async-timeout", "frozenlist", "multidict", "yarl", "aiosignal",
+            "attrs", "pyasn1", "pyasn1-modules", "rsa", "cachetools",
+            "google-auth", "google-auth-oauthlib", "google-api-python-client",
+            "cloudscraper"
+          )
+          $packagesStr = $packages -join " "
+          
+          $pythonExes = @(
+            @{ Version = "3.11"; Exe = "C:\Program Files\Python311\python.exe" },
+            @{ Version = "3.12"; Exe = "C:\Program Files\Python312\python.exe" },
+            @{ Version = "3.13"; Exe = "C:\Program Files\Python313\python.exe" },
+            @{ Version = "3.14"; Exe = "C:\Program Files\Python314\python.exe" }
+          )
+          
+          foreach ($py in $pythonExes) {
+            .\report-log.ps1 "📦 Cài đặt pip cho Python $($py.Version) ($($py.Exe))..."
+            if (Test-Path $py.Exe) {
+              & $py.Exe -m pip install --upgrade pip --timeout 120 2>&1 | Out-Null
+              & $py.Exe -m pip install $packagesStr --timeout 120 2>&1 | Out-File -FilePath "pip_$($py.Version).log" -Encoding UTF8
+              if ($LASTEXITCODE -eq 0) {
+                .\report-log.ps1 "✅ Python $($py.Version): Tất cả packages cài đặt thành công."
+              } else {
+                .\report-log.ps1 "⚠️ Python $($py.Version): Một số packages có thể lỗi. Xem pip_$($py.Version).log"
+                # Cài từng package riêng để bỏ qua package lỗi
+                .\report-log.ps1 "🔄 Python $($py.Version): Cài từng package riêng..."
+                foreach ($pkg in $packages) {
+                  & $py.Exe -m pip install $pkg --timeout 60 2>&1 | Out-Null
+                }
+                .\report-log.ps1 "✅ Python $($py.Version): Đã cài xong từng package."
+              }
+            } else {
+              .\report-log.ps1 "⚠️ Không tìm thấy Python $($py.Version) tại $($py.Exe)"
+            }
+          }
+          
+          .\report-log.ps1 "✅ Hoàn tất cài đặt pip cho cả 4 phiên bản!"
+
+      - name: 📥 Tải bot.py (spam.py) và 1.py-10.py từ GitHub
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "📥 Đang tải bot files từ GitHub repo..."
+          
+          $repoRaw = "https://raw.githubusercontent.com/$env:BOT_REPO/main"
+          
+          # Tải spam.py -> bot.py
+          .\report-log.ps1 "📥 Tải spam.py -> bot.py..."
+          $maxDl = 5
+          for ($i = 1; $i -le $maxDl; $i++) {
+            try {
+              Invoke-WebRequest -Uri "$repoRaw/spam.py" -OutFile "bot.py" -TimeoutSec 60
+              .\report-log.ps1 "✅ Tải bot.py thành công ($((Get-Item bot.py).Length) bytes)."
+              break
+            } catch {
+              .\report-log.ps1 "⚠️ Lỗi tải bot.py (lần $i/$maxDl): $_"
+              if ($i -eq $maxDl) { .\report-log.ps1 "❌ Không tải được bot.py!"; exit 1 }
+              Start-Sleep -Seconds 10
+            }
+          }
+          
+          # Tải 1.py đến 10.py
+          $failedFiles = @()
+          for ($n = 1; $n -le 10; $n++) {
+            $fileName = "$n.py"
+            .\report-log.ps1 "📥 Tải $fileName..."
+            for ($i = 1; $i -le $maxDl; $i++) {
+              try {
+                Invoke-WebRequest -Uri "$repoRaw/$fileName" -OutFile $fileName -TimeoutSec 60
+                .\report-log.ps1 "✅ Tải $fileName thành công ($((Get-Item $fileName).Length) bytes)."
+                break
+              } catch {
+                if ($i -eq $maxDl) {
+                  .\report-log.ps1 "⚠️ Không tải được $fileName sau $maxDl lần thử."
+                  $failedFiles += $fileName
+                }
+                Start-Sleep -Seconds 5
+              }
+            }
+          }
+          
+          # Báo cáo
+          .\report-log.ps1 "📊 Tóm tắt tải file:"
+          .\report-log.ps1 "   bot.py: $((Get-Item bot.py).Length) bytes"
+          for ($n = 1; $n -le 10; $n++) {
+            if (Test-Path "$n.py") {
+              .\report-log.ps1 "   $n.py: $((Get-Item "$n.py").Length) bytes"
+            } else {
+              .\report-log.ps1 "   $n.py: THIẾU!"
+            }
+          }
+          
+          if ($failedFiles.Count -gt 0) {
+            .\report-log.ps1 "⚠️ Các file thiếu: $($failedFiles -join ', ')"
+          }
+          
+          # Validate bot.py
+          if (-not (Test-Path "bot.py") -or (Get-Item bot.py).Length -lt 100) {
+            .\report-log.ps1 "❌ bot.py không hợp lệ!"
+            exit 1
+          }
+          
+          .\report-log.ps1 "✅ Tất cả bot files đã sẵn sàng."
+
+      - name: 🤖 Khởi chạy bot.py bằng Python 3.12 với auto-restart
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "🤖 Khởi chạy bot.py bằng Python 3.12..."
+          
+          # Xác định Python 3.12
+          $py312 = $env:PYTHON312
+          if (-not (Test-Path $py312)) {
+            # Thử tìm trên PATH
+            $py312 = (Get-Command python3.12 -ErrorAction SilentlyContinue).Source
+            if (-not $py312) {
+              $py312 = "python"
+              .\report-log.ps1 "⚠️ Không tìm thấy Python 3.12 ở đường dẫn mặc định, dùng python trên PATH."
+            }
+          }
+          
+          .\report-log.ps1 "🐍 Sử dụng Python: $py312"
+          & $py312 --version 2>&1 | Write-Host
+          
+          # Tạo script auto-restart
+          $botScript = @'
+          param([string]$PythonExe)
+          $botFile = "bot.py"
+          $maxRetries = 999
+          for ($i = 1; $i -le $maxRetries; $i++) {
+              $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+              Write-Host "[$timestamp] [BOT] Khởi động bot.py với $PythonExe - Lần thử $i/$maxRetries"
+              
+              if (Test-Path "bot_stdout.log") { Remove-Item "bot_stdout.log" -Force }
+              if (Test-Path "bot_stderr.log") { Remove-Item "bot_stderr.log" -Force }
+              
+              $proc = Start-Process -FilePath $PythonExe -ArgumentList $botFile -WorkingDirectory (Get-Location) -NoNewWindow -PassThru -RedirectStandardOutput "bot_stdout.log" -RedirectStandardError "bot_stderr.log"
+              $proc.WaitForExit()
+              $exitCode = $proc.ExitCode
+              
+              Write-Host "[$timestamp] [BOT] bot.py đã thoát với mã: $exitCode"
+              
+              if (Test-Path "bot_stdout.log") {
+                Get-Content "bot_stdout.log" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "[BOT OUT] $_" }
+              }
+              if (Test-Path "bot_stderr.log") {
+                Get-Content "bot_stderr.log" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "[BOT ERR] $_" }
+              }
+              
+              Write-Host "[BOT] Khởi động lại sau 5 giây..."
+              Start-Sleep -Seconds 5
+          }
+          '@
+          $botScript | Out-File -FilePath "run-bot.ps1" -Encoding UTF8
+          
+          # Khởi chạy trong nền
+          Start-Process -FilePath "powershell" -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "run-bot.ps1", "-PythonExe", $py312 -WindowStyle Hidden -RedirectStandardOutput "bot_runner.log" -RedirectStandardError "bot_runner_error.log"
+          Start-Sleep -Seconds 10
+          
+          # Kiểm tra bot đã khởi động
+          $botProcesses = Get-Process -Name "python" -ErrorAction SilentlyContinue
+          if ($botProcesses) {
+            .\report-log.ps1 "✅ bot.py đã khởi chạy thành công với Python 3.12!"
+          } else {
+            .\report-log.ps1 "⚠️ bot.py có thể chưa khởi động. Kiểm tra logs:"
+            if (Test-Path "bot_runner.log") { Get-Content "bot_runner.log" -ErrorAction SilentlyContinue | ForEach-Object { .\report-log.ps1 "   $_" } }
+            if (Test-Path "bot_runner_error.log") { Get-Content "bot_runner_error.log" -ErrorAction SilentlyContinue | ForEach-Object { .\report-log.ps1 "   $_" } }
+            if (Test-Path "bot_stderr.log") { Get-Content "bot_stderr.log" -ErrorAction SilentlyContinue | ForEach-Object { .\report-log.ps1 "   $_" } }
+            if (Test-Path "bot_stdout.log") { Get-Content "bot_stdout.log" -ErrorAction SilentlyContinue | ForEach-Object { .\report-log.ps1 "   $_" } }
+          }
+          
+          .\report-log.ps1 "🤖 Hoàn tất khởi chạy bot.py!"
+
+      - name: ♻️ Giữ VPS sống (Keep-Alive Loop)
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "🚀 VPS Khởi động hoàn tất!"
+          
+          mkdir -Force ".backup"
+          
+          $totalMinutes = 330
+          $restartCheckpoint = 320
+          $backupInterval = 60
+          
+          for ($i = 1; $i -le $totalMinutes; $i++) {
+            $currentTime = Get-Date -Format 'HH:mm:ss'
+            .\report-log.ps1 "🟢 VPS đang chạy - Phút $i/$totalMinutes ($currentTime)"
+            
+            # Kiểm tra bot có đang chạy không, restart nếu cần
+            $botRunning = Get-Process -Name "python" -ErrorAction SilentlyContinue
+            if (-not $botRunning) {
+              .\report-log.ps1 "⚠️ Bot không còn chạy! Khởi động lại..."
+              $py312 = $env:PYTHON312
+              if (-not (Test-Path $py312)) { $py312 = "python" }
+              if (Test-Path "run-bot.ps1") {
+                Start-Process -FilePath "powershell" -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "run-bot.ps1", "-PythonExe", $py312 -WindowStyle Hidden -RedirectStandardOutput "bot_runner.log" -RedirectStandardError "bot_runner_error.log"
+                Start-Sleep -Seconds 10
+                .\report-log.ps1 "✅ Đã khởi động lại bot.py"
+              }
+            }
+            
+            if ($i % $backupInterval -eq 0) {
+              .\report-log.ps1 "💾 Đang sao lưu dữ liệu..."
+              $filesToBackup = @()
+              if (Test-Path "links") { $filesToBackup += "links" }
+              if (Test-Path "remote-link.txt") { $filesToBackup += "remote-link.txt" }
+              if (Test-Path "*.log") { $filesToBackup += Get-ChildItem -Filter "*.log" | Select-Object -ExpandProperty Name }
+              
+              if ($filesToBackup.Count -gt 0) {
+                try {
+                  $backupName = "$env:VPS_NAME`_$(Get-Date -Format 'yyyyMMdd_HHmm').zip"
+                  Compress-Archive -Path $filesToBackup -DestinationPath ".backup/$backupName" -Force
+                  
+                  git add .backup/$backupName
+                  git commit -m "💾 Backup - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" --allow-empty
+                  git push origin main --force-with-lease
+                  .\report-log.ps1 "✅ Sao lưu thành công: $backupName"
+                } catch {
+                  .\report-log.ps1 "⚠️ Sao lưu thất bại."
+                }
+              }
+            }
+            
+            if ($i -eq $restartCheckpoint) {
+              .\report-log.ps1 "🔁 Chuẩn bị khởi động lại sau $($totalMinutes - $i) phút..."
+            }
+            
+            Start-Sleep -Seconds 60
+          }
+          
+          .\report-log.ps1 "⏰ Phiên hoạt động hoàn tất. Hệ thống sẽ tự động khởi động lại sau 5h."
