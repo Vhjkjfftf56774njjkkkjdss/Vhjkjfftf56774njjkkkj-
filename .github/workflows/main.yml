@@ -34,14 +34,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: 📦 Install Python Dependencies
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "📥 Đang cài đặt Python packages..."
-          python -m pip install --upgrade pip
-          pip install telebot requests beautifulsoup4 pytz colorama tqdm urllib3 pathlib psutil python-telegram-bot bs4 fake-useragent gspread oauth2client httpx ddddocr gtts deep-translator selenium webdriver-manager pyperclip pyTelegramBotAPI cfonts pycryptodome dexron aiohttp websocket-client python-socketio flask pillow qrcode python-dotenv lequangminh lxml requests-html PyGithub pyyaml toml configparser cryptography pyOpenSSL certifi chardet idna six typing-extensions zope.interface twisted autobahn websockets dnspython async-timeout frozenlist multidict yarl aiosignal attrs pyasn1 pyasn1-modules rsa cachetools google-auth google-auth-oauthlib google-api-python-client
-          .\report-log.ps1 "✅ Đã cài đặt xong Python packages."
-
       - name: 🛠️ Setup Logging Helper
         shell: pwsh
         run: |
@@ -60,6 +52,14 @@ jobs:
           }
           '@
           $code | Out-File -FilePath "report-log.ps1" -Encoding UTF8
+
+      - name: 📦 Install Python Dependencies
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "📥 Đang cài đặt Python packages..."
+          python -m pip install --upgrade pip
+          pip install telebot requests beautifulsoup4 pytz colorama tqdm urllib3 pathlib psutil python-telegram-bot bs4 fake-useragent gspread oauth2client httpx ddddocr gtts deep-translator selenium webdriver-manager pyperclip pyTelegramBotAPI cfonts pycryptodome dexron aiohttp websocket-client python-socketio flask pillow qrcode python-dotenv lequangminh lxml requests-html PyGithub pyyaml toml configparser cryptography pyOpenSSL certifi chardet idna six typing-extensions zope.interface twisted autobahn websockets dnspython async-timeout frozenlist multidict yarl aiosignal attrs pyasn1 pyasn1-modules rsa cachetools google-auth google-auth-oauthlib google-api-python-client
+          .\report-log.ps1 "✅ Đã cài đặt xong Python packages."
 
       - name: Download and Extract Bore
         shell: pwsh
