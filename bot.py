@@ -43,7 +43,7 @@ import random
 from collections import defaultdict
 from telebot import types
 from urllib.parse import quote
-bot_token = '7845936454:AAHGrld1WgMgYuPI_HM0hGr5OQp-ilus9Wc'
+bot_token = '8700676640:AAEoeDwVC4orjbbwBKuC5RS-g7Sb7TmG198'
 bot = telebot.TeleBot(bot_token)
 processes = []
 process_phones = {}
@@ -177,7 +177,7 @@ def is_banned(user_id):
     return str(user_id) in banned_users
 
 load_banned_users()
-ADMIN_ID = '7235906278'
+ADMIN_ID = '8854850558'
 user_cooldown_free = defaultdict(lambda: 0)
 user_cooldown_vip = defaultdict(lambda: 0)
 user_tokens = defaultdict(lambda: '')
