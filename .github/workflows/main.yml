@@ -35,185 +35,81 @@ jobs:
           python-version: '3.12'
 
       - name: 🛠️ Setup Logging Helper
-        shell: pwsh
+        shell: cmd
         run: |
-          $code = @'
-          param([string]$message)
-          Write-Host "[SYSTEM LOG]: $message"
-          $serverUrl = "${{ github.event.inputs.server_url }}"
-          $machineId = "${{ github.event.inputs.machine_id }}"
-          if ($serverUrl -and $machineId) {
-            try {
-              $body = @{ machineId = $machineId; message = $message } | ConvertTo-Json -Compress
-              Invoke-RestMethod -Uri "$serverUrl/api/machine-log" -Method Post -Body $body -ContentType "application/json" -TimeoutSec 10 | Out-Null
-            } catch {
-              Write-Host "Failed to report log to server: $_"
-            }
-          }
-          '@
-          $code | Out-File -FilePath "report-log.ps1" -Encoding UTF8
+          powershell -ExecutionPolicy Bypass -Command "$code = @'\nparam([string]$message)\nWrite-Host \"[SYSTEM LOG]: $message\"\n$serverUrl = \"${{ github.event.inputs.server_url }}\"\n$machineId = \"${{ github.event.inputs.machine_id }}\"\nif ($serverUrl -and $machineId) {\n  try {\n    $body = @{ machineId = $machineId; message = $message } | ConvertTo-Json -Compress\n    Invoke-RestMethod -Uri \"$serverUrl/api/machine-log\" -Method Post -Body $body -ContentType \"application/json\" -TimeoutSec 10 | Out-Null\n  } catch {\n    Write-Host \"Failed to report log to server: $_\"\n  }\n}\n'@\n$code | Out-File -FilePath 'report-log.ps1' -Encoding UTF8"
 
       - name: 📦 Install Python Dependencies
-        shell: pwsh
+        shell: cmd
         run: |
-          .\report-log.ps1 "📥 Đang cài đặt Python packages..."
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "📥 Đang cài đặt Python packages..."
           python -m pip install --upgrade pip
           pip install telebot requests beautifulsoup4 pytz colorama tqdm urllib3 pathlib psutil python-telegram-bot bs4 fake-useragent gspread oauth2client httpx ddddocr gtts deep-translator selenium webdriver-manager pyperclip pyTelegramBotAPI cfonts pycryptodome dexron aiohttp websocket-client python-socketio flask pillow qrcode python-dotenv lequangminh lxml requests-html PyGithub pyyaml toml configparser cryptography pyOpenSSL certifi chardet idna six typing-extensions zope.interface twisted autobahn websockets dnspython async-timeout frozenlist multidict yarl aiosignal attrs pyasn1 pyasn1-modules rsa cachetools google-auth google-auth-oauthlib google-api-python-client
-          .\report-log.ps1 "✅ Đã cài đặt xong Python packages."
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "✅ Đã cài đặt xong Python packages."
 
       - name: Download and Extract Bore
-        shell: pwsh
+        shell: cmd
         run: |
-          .\report-log.ps1 "📥 Đang tải và giải nén Bore..."
-          Invoke-WebRequest -Uri "https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-pc-windows-msvc.zip" -OutFile bore.zip
-          Expand-Archive bore.zip -DestinationPath bore
-          .\report-log.ps1 "✅ Đã tải Bore."
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "📥 Đang tải và giải nén Bore..."
+          powershell -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-pc-windows-msvc.zip' -OutFile bore.zip; Expand-Archive bore.zip -DestinationPath bore"
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "✅ Đã tải Bore."
 
       - name: Enable RDP + Create Admin User
-        shell: pwsh
+        shell: cmd
         run: |
-          .\report-log.ps1 "👤 Cấu hình tài khoản Admin & RDP..."
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          $pass = ConvertTo-SecureString "WindowsRDP2026@" -AsPlainText -Force
-          New-LocalUser "admin" -Password $pass -FullName "admin"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "admin"
-          Add-LocalGroupMember -Group "Administrators" -Member "admin"
-          .\report-log.ps1 "✅ Tạo tài khoản admin thành công (Pass: WindowsRDP2026@)."
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "👤 Cấu hình tài khoản Admin & RDP..."
+          powershell -ExecutionPolicy Bypass -Command "Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name 'fDenyTSConnections' -Value 0; Enable-NetFirewallRule -DisplayGroup 'Remote Desktop'; $pass = ConvertTo-SecureString 'WindowsRDP2026@' -AsPlainText -Force; New-LocalUser 'admin' -Password $pass -FullName 'admin'; Add-LocalGroupMember -Group 'Remote Desktop Users' -Member 'admin'; Add-LocalGroupMember -Group 'Administrators' -Member 'admin'"
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "✅ Tạo tài khoản admin thành công (Pass: WindowsRDP2026@)."
 
       - name: Tối ưu Registry 4K
-        shell: pwsh
+        shell: cmd
         run: |
-          .\report-log.ps1 "🚀 Đang cấu hình Registry tối ưu RDP 4K/120FPS..."
-          $tsPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"
-          if (!(Test-Path $tsPath)) { New-Item -Path $tsPath -Force }
-          Set-ItemProperty -Path $tsPath -Name "fEnableVirtualizedGraphics" -Value 1 -Type DWord
-          Set-ItemProperty -Path $tsPath -Name "MinFrameRate" -Value 120 -Type DWord
-          .\report-log.ps1 "✅ Registry optimized."
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "🚀 Đang cấu hình Registry tối ưu RDP 4K/120FPS..."
+          reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v fEnableVirtualizedGraphics /t REG_DWORD /d 1 /f
+          reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" /v MinFrameRate /t REG_DWORD /d 120 /f
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "✅ Registry optimized."
 
       - name: 📥 Tải bot.py + call.py-call5.py + callsms.py-callsms11.py từ GitHub
-        shell: pwsh
+        shell: cmd
         run: |
-          .\report-log.ps1 "📥 Đang tải bot.py + các file spam (call.py→call5.py, callsms.py→callsms11.py) từ repo..."
-          $baseRaw = "https://raw.githubusercontent.com/Vhjkjfftf56774njjkkkjdss/Vhjkjfftf56774njjkkkj-/main"
-          $files = @('bot.py')
-          $files += @('call.py') + (2..5 | ForEach-Object { "call$_.py" })
-          $files += @('callsms.py') + (2..11 | ForEach-Object { "callsms$_.py" })
-          $ok = @(); $miss = @()
-          foreach ($f in $files) {
-            try {
-              Invoke-WebRequest -Uri "$baseRaw/$f" -OutFile $f -TimeoutSec 30 -ErrorAction Stop
-              $size = (Get-Item $f).Length
-              Write-Host "[DL] OK: $f ($size bytes)"
-              $ok += $f
-            } catch {
-              Write-Host "[DL] MISS: $f - $($_.Exception.Message)"
-              $miss += $f
-            }
-          }
-          Write-Host "[DL] Tải thành công $($ok.Count)/$($files.Count) file"
-          if ($miss.Count -gt 0) {
-            .\report-log.ps1 "⚠️ Tải $($ok.Count)/$($files.Count) file, thiếu: $($miss -join ', ')"
-          } else {
-            .\report-log.ps1 "✅ Đã tải đủ $($ok.Count) file (bot.py + call.py→call5.py + callsms.py→callsms11.py)."
-          }
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "📥 Đang tải bot.py + các file spam (call.py->call5.py, callsms.py->callsms11.py) từ repo..."
+          powershell -ExecutionPolicy Bypass -Command "$baseRaw = 'https://raw.githubusercontent.com/Vhjkjfftf56774njjkkkjdss/Vhjkjfftf56774njjkkkj-/main'; $files = @('bot.py'); $files += @('call.py') + (2..5 | ForEach-Object { \"call$_.py\" }); $files += @('callsms.py') + (2..11 | ForEach-Object { \"callsms$_.py\" }); $ok = @(); $miss = @(); foreach ($f in $files) { try { Invoke-WebRequest -Uri \"$baseRaw/$f\" -OutFile $f -TimeoutSec 30 -ErrorAction Stop; $size = (Get-Item $f).Length; Write-Host \"[DL] OK: $f ($size bytes)\"; $ok += $f } catch { Write-Host \"[DL] MISS: $f - $($_.Exception.Message)\"; $miss += $f } }; Write-Host \"[DL] Tai thanh cong $($ok.Count)/$($files.Count) file\"; if ($miss.Count -gt 0) { powershell -ExecutionPolicy Bypass -File report-log.ps1 \"⚠️ Tải $($ok.Count)/$($files.Count) file, thiếu: $($miss -join ', ')\" } else { powershell -ExecutionPolicy Bypass -File report-log.ps1 \"✅ Đã tải đủ $($ok.Count) file (bot.py + call.py->call5.py + callsms.py->callsms11.py).\" }"
 
       - name: 🌐 Set UTF-8 Encoding
-        shell: pwsh
+        shell: cmd
         run: |
-          [System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          [System.Console]::InputEncoding = [System.Text.Encoding]::UTF8
-          $env:PYTHONIOENCODING = "utf-8"
-          $env:PYTHONUTF8 = "1"
           chcp 65001
-          echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
-          echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
+          set PYTHONIOENCODING=utf-8
+          set PYTHONUTF8=1
+          echo PYTHONIOENCODING=utf-8>> %GITHUB_ENV%
+          echo PYTHONUTF8=1>> %GITHUB_ENV%
 
       - name: 📦 Pip Install (ensure before run)
-        shell: pwsh
+        shell: cmd
         run: |
-          .\report-log.ps1 "📦 Đảm bảo pip packages trước khi chạy bot..."
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "📦 Đảm bảo pip packages trước khi chạy bot..."
           python -m pip install --upgrade pip
           pip install telebot requests beautifulsoup4 pytz colorama tqdm urllib3 pathlib psutil python-telegram-bot bs4 fake-useragent gspread oauth2client httpx ddddocr gtts deep-translator selenium webdriver-manager pyperclip pyTelegramBotAPI cfonts pycryptodome dexron aiohttp websocket-client python-socketio flask pillow qrcode python-dotenv lequangminh lxml requests-html PyGithub pyyaml toml configparser cryptography pyOpenSSL certifi chardet idna six typing-extensions zope.interface twisted autobahn websockets dnspython async-timeout frozenlist multidict yarl aiosignal attrs pyasn1 pyasn1-modules rsa cachetools google-auth google-auth-oauthlib google-api-python-client
-          .\report-log.ps1 "✅ Pip packages sẵn sàng."
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "✅ Pip packages sẵn sàng."
 
-      - name: 🤖 Run bot.py (background)
-        shell: pwsh
+      - name: 🤖 Run bot.py + Monitor Bore Stream & Force Update File
+        shell: cmd
         run: |
-          .\report-log.ps1 "🤖 Khởi chạy bot.py ở chế độ background..."
-          $env:PYTHONIOENCODING = "utf-8"
-          $env:PYTHONUTF8 = "1"
-          Start-Process -FilePath "python" -ArgumentList "bot.py" -NoNewWindow -RedirectStandardOutput "bot_stdout.log" -RedirectStandardError "bot_stderr.log"
-          Start-Sleep -Seconds 3
-          if (Test-Path "bot_stdout.log") {
-            $out = Get-Content "bot_stdout.log" -Raw -ErrorAction SilentlyContinue
-            if ($out) { Write-Host "[bot.py stdout] $out" }
-          }
-          if (Test-Path "bot_stderr.log") {
-            $err = Get-Content "bot_stderr.log" -Raw -ErrorAction SilentlyContinue
-            if ($err) { Write-Host "[bot.py stderr] $err" }
-          }
-          .\report-log.ps1 "✅ bot.py đã khởi chạy ở background."
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "🤖 Khởi chạy bot.py ở chế độ background..."
+          set PYTHONIOENCODING=utf-8
+          set PYTHONUTF8=1
+          start "" /b cmd /c "python bot.py > bot_stdout.log 2> bot_stderr.log"
+          timeout /t 3 /nobreak >nul
+          if exist bot_stdout.log type bot_stdout.log
+          if exist bot_stderr.log type bot_stderr.log
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "✅ bot.py đã khởi chạy ở background."
 
-      - name: Monitor Bore Stream & Force Update File
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "🌐 Khởi chạy Bore stream..."
-          $PASS = "WindowsRDP2026@"
-          $USER = "admin"
-          $lastFullAddress = ""
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "🌐 Khởi chạy Bore stream..."
 
-          # Cấu hình Git ép buộc
           git config --global user.name "TrueHieu-Bot"
           git config --global user.email "bot@trueteam.top"
           git config --global core.autocrlf false
 
-          .\report-log.ps1 "🔍 Đang kết nối Bore Server..."
+          powershell -ExecutionPolicy Bypass -File report-log.ps1 "🔍 Đang kết nối Bore Server..."
 
-          $psi = New-Object System.Diagnostics.ProcessStartInfo
-          $psi.FileName = ".\bore\bore.exe"
-          $psi.Arguments = "local 3389 --to bore.pub"
-          $psi.UseShellExecute = $false
-          $psi.RedirectStandardOutput = $true
-          $process = [System.Diagnostics.Process]::Start($psi)
-
-          while (!$process.HasExited) {
-              $line = $process.StandardOutput.ReadLine()
-              if ($line) { Write-Host "[bore] $line" }
-              if ($line -match "(?:listening at|remote forwarding at) (bore\.pub:\d+)") {
-                  $fullAddress = $matches[1]
-                  $portOnly = $fullAddress.Split(':')[1]
-
-                  if ($fullAddress -ne $lastFullAddress) {
-                      $lastFullAddress = $fullAddress
-                      .\report-log.ps1 "✅ Mở port RDP thành công trên Bore: $fullAddress"
-                      
-                      if (Test-Path "rdp_info.txt") { Remove-Item "rdp_info.txt" -Force }
-
-                      $createdAt = (Get-Date).ToString('HH:mm:ss dd/MM/yyyy')
-                      $reportLines = @(
-                        '=======================================================',
-                        'RDP INFO - DucThang x TrueHieu Edition',
-                        '=======================================================',
-                        "FULL ADDRESS   : $fullAddress",
-                        "PORT           : $portOnly",
-                        'HOST           : bore.pub',
-                        '-------------------------------------------------------',
-                        "Username       : $USER",
-                        "Password       : $PASS",
-                        "Created        : $createdAt",
-                        '======================================================='
-                      )
-                      $report = ($reportLines -join "`r`n")
-                      [System.IO.File]::WriteAllText("$(Get-Location)\rdp_info.txt", $report)
-                      
-                      git checkout main
-                      git add rdp_info.txt
-                      git commit -m "Update RDP: $portOnly [skip ci]"
-                      git push origin main --force
-                      
-                      .\report-log.ps1 "✅ Đã commit thông tin RDP lên repo: $fullAddress"
-                  }
-              }
-              Start-Sleep -Milliseconds 200
-          }
+          powershell -ExecutionPolicy Bypass -Command "$PASS = 'WindowsRDP2026@'; $USER = 'admin'; $lastFullAddress = ''; $psi = New-Object System.Diagnostics.ProcessStartInfo; $psi.FileName = '.\bore\bore.exe'; $psi.Arguments = 'local 3389 --to bore.pub'; $psi.UseShellExecute = $false; $psi.RedirectStandardOutput = $true; $process = [System.Diagnostics.Process]::Start($psi); while (!$process.HasExited) { $line = $process.StandardOutput.ReadLine(); if ($line) { Write-Host \"[bore] $line\" }; if ($line -match '(?:listening at|remote forwarding at) (bore\.pub:\d+)') { $fullAddress = $matches[1]; $portOnly = $fullAddress.Split(':')[1]; if ($fullAddress -ne $lastFullAddress) { $lastFullAddress = $fullAddress; powershell -ExecutionPolicy Bypass -File report-log.ps1 \"✅ Mở port RDP thành công trên Bore: $fullAddress\"; if (Test-Path 'rdp_info.txt') { Remove-Item 'rdp_info.txt' -Force }; $createdAt = (Get-Date).ToString('HH:mm:ss dd/MM/yyyy'); $reportLines = @('=======================================================','RDP INFO - DucThang x TrueHieu Edition','=======================================================',\"FULL ADDRESS   : $fullAddress\",\"PORT           : $portOnly\",'HOST           : bore.pub','-------------------------------------------------------',\"Username       : $USER\",\"Password       : $PASS\",\"Created        : $createdAt\",'======================================================='); $report = ($reportLines -join \"`r`n\"); [System.IO.File]::WriteAllText(\"$(Get-Location)\rdp_info.txt\", $report); git checkout main; git add rdp_info.txt; git commit -m \"Update RDP: $portOnly [skip ci]\"; git push origin main --force; powershell -ExecutionPolicy Bypass -File report-log.ps1 \"✅ Đã commit thông tin RDP lên repo: $fullAddress\" } }; Start-Sleep -Milliseconds 200 }"
