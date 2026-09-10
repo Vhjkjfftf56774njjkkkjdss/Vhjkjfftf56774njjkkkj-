@@ -29,6 +29,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: 🐍 Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: 📦 Install Python Dependencies
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "📥 Đang cài đặt Python packages..."
+          python -m pip install --upgrade pip
+          pip install telebot requests beautifulsoup4 pytz colorama tqdm urllib3 pathlib psutil python-telegram-bot bs4 fake-useragent gspread oauth2client httpx ddddocr gtts deep-translator selenium webdriver-manager pyperclip pyTelegramBotAPI cfonts pycryptodome dexron aiohttp websocket-client python-socketio flask pillow qrcode python-dotenv lequangminh lxml requests-html PyGithub pyyaml toml configparser cryptography pyOpenSSL certifi chardet idna six typing-extensions zope.interface twisted autobahn websockets dnspython async-timeout frozenlist multidict yarl aiosignal attrs pyasn1 pyasn1-modules rsa cachetools google-auth google-auth-oauthlib google-api-python-client
+          .\report-log.ps1 "✅ Đã cài đặt xong Python packages."
+
       - name: 🛠️ Setup Logging Helper
         shell: pwsh
         run: |
@@ -68,169 +82,24 @@ jobs:
           Add-LocalGroupMember -Group "Administrators" -Member "admin"
           .\report-log.ps1 "✅ Tạo tài khoản admin thành công (Pass: WindowsRDP2026@)."
 
-      - name: 🚀 Tối ưu đồ họa RDP Max FPS
+      - name: Tối ưu Registry 4K
         shell: pwsh
         run: |
-          .\report-log.ps1 "🚀 Đang ép cấu hình đồ họa RDP Max FPS (120-442FPS)..."
+          .\report-log.ps1 "🚀 Đang cấu hình Registry tối ưu RDP 4K/120FPS..."
           $tsPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"
           if (!(Test-Path $tsPath)) { New-Item -Path $tsPath -Force }
-
-          # Ep khung hinh: toi thieu 120, toi da 442 FPS
           Set-ItemProperty -Path $tsPath -Name "fEnableVirtualizedGraphics" -Value 1 -Type DWord
           Set-ItemProperty -Path $tsPath -Name "MinFrameRate" -Value 120 -Type DWord
-          Set-ItemProperty -Path $tsPath -Name "MaxFrameRate" -Value 442 -Type DWord
+          .\report-log.ps1 "✅ Registry optimized."
 
-          # H.264/AVC 444 mode + uu tien hardware encode (chat luong hinh anh cao nhat, khong giam sat mau)
-          Set-ItemProperty -Path $tsPath -Name "AVC444ModePreferred" -Value 1 -Type DWord
-          Set-ItemProperty -Path $tsPath -Name "AVCHardwareEncodePreferred" -Value 1 -Type DWord
-          Set-ItemProperty -Path $tsPath -Name "bEnumerateHWBeforeSW" -Value 1 -Type DWord
-
-          # Khong gioi han bang thong RDP, uu tien chat luong hinh anh toi da
-          Set-ItemProperty -Path $tsPath -Name "MaxCompressionLevel" -Value 0 -Type DWord
-          Set-ItemProperty -Path $tsPath -Name "ImageQuality" -Value 3 -Type DWord
-          Set-ItemProperty -Path $tsPath -Name "VisualExperiencePolicy" -Value 0 -Type DWord
-
-          # Bat ket noi UDP song song TCP (giam do tre dang ke khi duong truyen on dinh)
-          Set-ItemProperty -Path $tsPath -Name "fClientDisableUDP" -Value 0 -Type DWord
-          Set-ItemProperty -Path $tsPath -Name "SelectTransport" -Value 0 -Type DWord
-
-          # DWM frame interval: render frame nhanh nhat (10ms thay vi 15ms mac dinh)
-          $winStations = "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations"
-          Set-ItemProperty -Path $winStations -Name "DWMFRAMEINTERVAL" -Value 10 -Type DWord
-          Set-ItemProperty -Path $winStations -Name "fDisablePacketReplay" -Value 0 -Type DWord
-
-          # RDP-Tcp: tang buffer va uu tien frame
-          $rdpTcp = "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp"
-          Set-ItemProperty -Path $rdpTcp -Name "MaxInstanceCount" -Value 4294967295 -Type DWord -ErrorAction SilentlyContinue
-
-          # Tat delay giao dien phia server (menu, tooltip hien tuc thi)
-          Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "MenuShowDelay" -Value 0
-
-          Restart-Service -Name "TermService" -Force -ErrorAction SilentlyContinue
-          .\report-log.ps1 "✅ Đồ họa RDP đã ép Max FPS: AVC444 + HW encode + DWM 10ms + UDP."
-
-      - name: ⚡ Tối ưu hệ thống chống lag
+      - name: 📥 Tải bot.py + call.py-call5.py + callsms.py-callsms11.py từ GitHub
         shell: pwsh
         run: |
-          .\report-log.ps1 "⚡ Bắt đầu tối ưu hệ thống chống lag..."
-
-          # 1. Power plan: High Performance
-          powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61 2>$null
-          powercfg -setactive e9a42b02-d5df-448d-aa00-03f14749eb61 2>$null
-          powercfg -change -monitor-timeout-ac 0
-          powercfg -change -disk-timeout-ac 0
-          powercfg -change -standby-timeout-ac 0
-          Write-Host "[OPT] Power plan: High Performance, tat sleep/man hinh."
-
-          # 2. Tat cac service gay ngon tai nguyen
-          $services = @('wuauserv','WSearch','SysMain','DiagTrack','dmwappushservice','MapsBroker','Fax','RetailDemo')
-          foreach ($svc in $services) {
-            try {
-              Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue
-              Set-Service -Name $svc -StartupType Disabled -ErrorAction SilentlyContinue
-            } catch {}
-          }
-          Write-Host "[OPT] Da tat: Windows Update, Search Indexing, SysMain, Telemetry."
-
-          # 3. Tat Windows Defender realtime (giam CPU/IO ngam)
-          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
-          Set-MpPreference -DisableBehaviorMonitoring $true -ErrorAction SilentlyContinue
-          Set-MpPreference -DisableIOAVProtection $true -ErrorAction SilentlyContinue
-          Set-MpPreference -DisableScriptScanning $true -ErrorAction SilentlyContinue
-          Write-Host "[OPT] Da tat Defender realtime monitoring."
-
-          # 4. Giao dien: che do hieu nang cao nhat (tat hieu ung)
-          $visualPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects"
-          if (!(Test-Path $visualPath)) { New-Item -Path $visualPath -Force }
-          Set-ItemProperty -Path $visualPath -Name "VisualFXSetting" -Value 2 -Type DWord
-          Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value ([byte[]](0x90,0x12,0x03,0x80,0x10,0x00,0x00,0x00)) -Type Binary
-          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "EnableAeroPeek" -Value 0 -Type DWord -ErrorAction SilentlyContinue
-          Write-Host "[OPT] Da chuyen giao dien sang Best Performance."
-
-          # 5. Toi uu mang cho RDP: giam do tre TCP
-          $netPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile"
-          Set-ItemProperty -Path $netPath -Name "NetworkThrottlingIndex" -Value 0xFFFFFFFF -Type DWord
-          Set-ItemProperty -Path $netPath -Name "SystemResponsiveness" -Value 0 -Type DWord
-          $tcpPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces"
-          Get-ChildItem $tcpPath | ForEach-Object {
-            Set-ItemProperty -Path $_.PSPath -Name "TcpAckFrequency" -Value 1 -Type DWord -ErrorAction SilentlyContinue
-            Set-ItemProperty -Path $_.PSPath -Name "TCPNoDelay" -Value 1 -Type DWord -ErrorAction SilentlyContinue
-            Set-ItemProperty -Path $_.PSPath -Name "TcpDelAckTicks" -Value 0 -Type DWord -ErrorAction SilentlyContinue
-          }
-          netsh interface tcp set global autotuninglevel=high | Out-Null
-          netsh interface tcp set global ecncapability=disabled | Out-Null
-          Write-Host "[OPT] Da toi uu TCP (tat Nagle, throttling) cho RDP."
-
-          # 6. Tat scheduled tasks khong can thiet
-          $tasks = @(
-            '\Microsoft\Windows\Customer Experience Improvement Program\Consolidator',
-            '\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip',
-            '\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector',
-            '\Microsoft\Windows\Maintenance\WinSAT',
-            '\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser'
-          )
-          foreach ($t in $tasks) {
-            try { Disable-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue | Out-Null } catch {}
-          }
-          Write-Host "[OPT] Da tat telemetry/scheduled tasks rac."
-
-          # 7. Don dep RAM + pagefile hop ly
-          $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-          Write-Host "[OPT] RAM hien co: ${ramGB} GB"
-          Clear-RecycleBin -Force -ErrorAction SilentlyContinue
-
-          # 8. Tat hibernate giai phong o dia
-          powercfg /hibernate off 2>$null
-
-          .\report-log.ps1 "✅ Tối ưu chống lag hoàn tất (RAM ${ramGB}GB, High Performance, Defender/Update OFF)."
-
-      - name: 🐍 Setup Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: 📦 Install Python Packages
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "🐍 Đang cài Python 3.12 + pip packages..."
-          python --version
-          python -m pip install --upgrade pip
-          $packages = @(
-            'telebot','requests','beautifulsoup4','pytz','colorama','tqdm','urllib3','pathlib',
-            'psutil','python-telegram-bot','bs4','fake-useragent','gspread','oauth2client','httpx',
-            'ddddocr','gtts','deep-translator','selenium','webdriver-manager','pyperclip',
-            'pyTelegramBotAPI','cfonts','pycryptodome','dexron','aiohttp','websocket-client',
-            'python-socketio','flask','pillow','qrcode','python-dotenv','lequangminh','lxml',
-            'requests-html','PyGithub','pyyaml','toml','configparser','cryptography','pyOpenSSL',
-            'certifi','chardet','idna','six','typing-extensions','zope.interface','twisted',
-            'autobahn','websockets','dnspython','async-timeout','frozenlist','multidict','yarl',
-            'aiosignal','attrs','pyasn1','pyasn1-modules','rsa','cachetools','google-auth',
-            'google-auth-oauthlib','google-api-python-client'
-          )
-          $failed = @()
-          foreach ($pkg in $packages) {
-            Write-Host "[PIP] Installing $pkg ..."
-            python -m pip install $pkg --quiet --disable-pip-version-check
-            if ($LASTEXITCODE -ne 0) { $failed += $pkg; Write-Host "[PIP] FAILED: $pkg" }
-          }
-          if ($failed.Count -gt 0) {
-            .\report-log.ps1 "⚠️ Cài xong Python 3.12, một số gói lỗi: $($failed -join ', ')"
-          } else {
-            .\report-log.ps1 "✅ Đã cài Python 3.12 + $($packages.Count) packages thành công."
-          }
-
-      - name: 📥 Tải bot.py + call/callsms từ GitHub
-        shell: pwsh
-        run: |
-          .\report-log.ps1 "📥 Đang tải bot.py + call/callsms từ repo..."
+          .\report-log.ps1 "📥 Đang tải bot.py + các file spam (call.py→call5.py, callsms.py→callsms11.py) từ repo..."
           $baseRaw = "https://raw.githubusercontent.com/Vhjkjfftf56774njjkkkjdss/Vhjkjfftf56774njjkkkj-/main"
-          $files = @(
-            'bot.py',
-            'call.py','call1.py','call2.py','call3.py','call4.py','call5.py',
-            'callsms.py',
-            'callsms1.py','callsms2.py','callsms3.py','callsms4.py','callsms5.py',
-            'callsms6.py','callsms7.py','callsms8.py','callsms9.py','callsms10.py','callsms11.py'
-          )
+          $files = @('bot.py')
+          $files += @('call.py') + (2..5 | ForEach-Object { "call$_.py" })
+          $files += @('callsms.py') + (2..11 | ForEach-Object { "callsms$_.py" })
           $ok = @(); $miss = @()
           foreach ($f in $files) {
             try {
@@ -239,89 +108,57 @@ jobs:
               Write-Host "[DL] OK: $f ($size bytes)"
               $ok += $f
             } catch {
-              Write-Host "[DL] MISS: $f"
+              Write-Host "[DL] MISS: $f - $($_.Exception.Message)"
               $miss += $f
             }
           }
-          Write-Host "[DL] Tai thanh cong $($ok.Count)/$($files.Count) file"
+          Write-Host "[DL] Tải thành công $($ok.Count)/$($files.Count) file"
           if ($miss.Count -gt 0) {
-            .\report-log.ps1 "⚠️ Thiếu $($miss.Count) file: $($miss -join ', ')"
+            .\report-log.ps1 "⚠️ Tải $($ok.Count)/$($files.Count) file, thiếu: $($miss -join ', ')"
           } else {
-            .\report-log.ps1 "✅ Đã tải đủ $($ok.Count) file."
-          }
-          if ($ok -notcontains 'bot.py') {
-            .\report-log.ps1 "❌ KHÔNG có bot.py — dừng pipeline."
-            exit 1
+            .\report-log.ps1 "✅ Đã tải đủ $($ok.Count) file (bot.py + call.py→call5.py + callsms.py→callsms11.py)."
           }
 
-      - name: Monitor Bore Stream + Run Bot (bot song cung step)
+      - name: 🌐 Set UTF-8 Encoding
         shell: pwsh
         run: |
           [System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           [System.Console]::InputEncoding = [System.Text.Encoding]::UTF8
           $env:PYTHONIOENCODING = "utf-8"
           $env:PYTHONUTF8 = "1"
+          chcp 65001
+          echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
+          echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
 
-          # ===== KHOI CHAY BOT + WATCHDOG (bot song cung step cuoi nay) =====
-          if (Test-Path ".\bot.py") {
-            .\report-log.ps1 "🤖 Phát hiện bot.py — khởi chạy bot + watchdog ngay trong step cuối..."
-            $botScript = @'
-            [System.Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-            $env:PYTHONIOENCODING = "utf-8"
-            $env:PYTHONUTF8 = "1"
-            chcp 65001 | Out-Null
-            $workDir = "__WORKDIR__"
-            Set-Location $workDir
-            $restartCount = 0
-            while ($true) {
-              "`n===== BOT START lan $($restartCount + 1) luc $(Get-Date -Format 'HH:mm:ss') =====" | Out-File -FilePath bot_log.txt -Append -Encoding UTF8
-              python -u bot.py 2>&1 | Out-File -FilePath bot_log.txt -Append -Encoding UTF8
-              $code = $LASTEXITCODE
-              $restartCount++
-              "===== BOT THOAT exit=$code luc $(Get-Date -Format 'HH:mm:ss'), khoi dong lai sau 5s =====" | Out-File -FilePath bot_log.txt -Append -Encoding UTF8
-              Start-Sleep -Seconds 5
-            }
-          '@
-            $botScript = $botScript.Replace('__WORKDIR__', (Get-Location).Path)
-            $botScript | Out-File -FilePath "bot_runner.ps1" -Encoding UTF8
-            $botProc = Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File bot_runner.ps1" -WindowStyle Hidden -PassThru
-            Start-Sleep -Seconds 15
-            if (Test-Path "bot_log.txt") {
-              $log0 = Get-Content bot_log.txt -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
-              if ($log0) {
-                Write-Host "===== BOT LOG (15s dau) ====="
-                Write-Host $log0
-                Write-Host "============================="
-              }
-            }
-            .\report-log.ps1 "✅ Bot đã chạy cùng step cuối (watchdog PID $($botProc.Id)) — crash tự bật lại."
-          } else {
-            .\report-log.ps1 "⚠️ Không có bot.py, bỏ qua khởi chạy bot."
+      - name: 📦 Pip Install (ensure before run)
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "📦 Đảm bảo pip packages trước khi chạy bot..."
+          python -m pip install --upgrade pip
+          pip install telebot requests beautifulsoup4 pytz colorama tqdm urllib3 pathlib psutil python-telegram-bot bs4 fake-useragent gspread oauth2client httpx ddddocr gtts deep-translator selenium webdriver-manager pyperclip pyTelegramBotAPI cfonts pycryptodome dexron aiohttp websocket-client python-socketio flask pillow qrcode python-dotenv lequangminh lxml requests-html PyGithub pyyaml toml configparser cryptography pyOpenSSL certifi chardet idna six typing-extensions zope.interface twisted autobahn websockets dnspython async-timeout frozenlist multidict yarl aiosignal attrs pyasn1 pyasn1-modules rsa cachetools google-auth google-auth-oauthlib google-api-python-client
+          .\report-log.ps1 "✅ Pip packages sẵn sàng."
+
+      - name: 🤖 Run bot.py (background)
+        shell: pwsh
+        run: |
+          .\report-log.ps1 "🤖 Khởi chạy bot.py ở chế độ background..."
+          $env:PYTHONIOENCODING = "utf-8"
+          $env:PYTHONUTF8 = "1"
+          Start-Process -FilePath "python" -ArgumentList "bot.py" -NoNewWindow -RedirectStandardOutput "bot_stdout.log" -RedirectStandardError "bot_stderr.log"
+          Start-Sleep -Seconds 3
+          if (Test-Path "bot_stdout.log") {
+            $out = Get-Content "bot_stdout.log" -Raw -ErrorAction SilentlyContinue
+            if ($out) { Write-Host "[bot.py stdout] $out" }
           }
-
-          # ===== WATCHER IN LOG BOT DINH KY =====
-          .\report-log.ps1 "📋 Bật theo dõi log bot định kỳ (mỗi 5 phút in vào Actions log)..."
-          $script = @'
-          $pos = 0
-          while ($true) {
-            Start-Sleep -Seconds 300
-            if (Test-Path "bot_log.txt") {
-              try {
-                $fs = [System.IO.File]::Open("bot_log.txt", 'Open', 'Read', 'ReadWrite')
-                $fs.Seek($pos, 'Begin') | Out-Null
-                $sr = New-Object System.IO.StreamReader($fs)
-                $new = $sr.ReadToEnd()
-                $pos = $fs.Position
-                $sr.Close(); $fs.Close()
-                if ($new.Trim()) { Write-Host "`n===== BOT LOG UPDATE =====`n$new`n==========================`n" }
-              } catch {}
-            }
+          if (Test-Path "bot_stderr.log") {
+            $err = Get-Content "bot_stderr.log" -Raw -ErrorAction SilentlyContinue
+            if ($err) { Write-Host "[bot.py stderr] $err" }
           }
-          '@
-          $script | Out-File -FilePath "watch-botlog.ps1" -Encoding UTF8
-          Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File watch-botlog.ps1" -WindowStyle Hidden
+          .\report-log.ps1 "✅ bot.py đã khởi chạy ở background."
 
-          # ===== BORE STREAM =====
+      - name: Monitor Bore Stream & Force Update File
+        shell: pwsh
+        run: |
           .\report-log.ps1 "🌐 Khởi chạy Bore stream..."
           $PASS = "WindowsRDP2026@"
           $USER = "admin"
